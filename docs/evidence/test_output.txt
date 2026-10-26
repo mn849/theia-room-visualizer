@@ -1,4 +1,4 @@
-# Test run Mon Oct 26 12:38:45 EDT 2026
+# Test run Mon Oct 26 12:39:34 EDT 2026
 
 $ python tests/test_geometry.py
 (1.45, -12, 0, 0) height 1.45 pitch -12.0 roll 0.0 clicked floor corners EXIF 35 mm focal length
@@ -26,3 +26,6 @@ $ python tests/test_agent_safety.py
 3 broken reply -> {'category': 'rug', 'pose': 'flat', 'flags': [], 'source': 'deterministic fallback'}
 4 log statuses: ['success', 'error'] ; key in log: False
 agent safety tests passed
+5a five identical adds -> model calls: 1
+5b runaway loop of 10 new listings with cap 3 -> model calls: 3 ; last flag: ['hourly model budget reached; deterministic classification used']
+overspending tests passed

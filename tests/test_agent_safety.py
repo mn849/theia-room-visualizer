@@ -59,3 +59,24 @@ log = [json.loads(line) for line in open(listing_agent.LOG_PATH)]
 print("4 log statuses:", [entry["status"] for entry in log], "; key in log:", any("test-key" in json.dumps(e) for e in log))
 assert not any("test-key" in json.dumps(e) for e in log)
 print("agent safety tests passed")
+
+# 5. Overspending: repeated listings hit the cache; a runaway loop hits the hourly cap.
+listing_agent._recent_calls.clear(); listing_agent._result_cache.clear()
+calls = {"n": 0}
+Base = fake_client(json.dumps({"category": "bench", "pose": "upright", "flags": []}))
+class Counting(Base):
+    def __init__(self, **kw):
+        super().__init__(**kw); inner = self.responses.create
+        def create(**k):
+            calls["n"] += 1; return inner(**k)
+        self.responses.create = create
+listing_agent.OpenAI = Counting
+for _ in range(5):
+    listing_agent.analyze_listing("Spindle bench", "same listing added again")
+print("5a five identical adds -> model calls:", calls["n"])
+assert calls["n"] == 1
+listing_agent.MAX_CALLS_PER_HOUR = 3
+results = [listing_agent.analyze_listing(f"Chair {i}", "loop") for i in range(10)]
+print("5b runaway loop of 10 new listings with cap 3 -> model calls:", calls["n"], "; last flag:", results[-1]["flags"])
+assert calls["n"] == 3 and results[-1]["source"] == "deterministic fallback"
+print("overspending tests passed")
