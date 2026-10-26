@@ -100,6 +100,6 @@ if __name__ == "__main__":
         if source.exists():
             (ROOT / f"{name}.html").write_text(render(source.read_text()))
             print(f"wrote {name}.html")
-    missing = [n for n in ("room-upload", "floor-corners", "add-listing", "photo-view", "orbit-view", "top-view", "item-card", "back-silhouette", "terminal-log", "view-2d") if not screenshot(n)]
+    missing = [n for n in ("room-upload", "floor-corners", "add-listing", "photo-view", "orbit-view", "top-view", "item-card", "back-silhouette", "terminal-log", "view-2d", "heart-message") if not screenshot(n)]
     if missing:
         print("screenshots still missing:", ", ".join(missing))

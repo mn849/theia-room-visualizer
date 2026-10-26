@@ -19,6 +19,7 @@ from listing_agent import analyze_listing
 import item_cutout
 import media_store
 import room_geometry
+from message_agent import draft_seller_message
 import depth_model
 
 try:
@@ -732,8 +733,87 @@ def item_card(item: dict):
         html.Div([html.Img(src=hero["cutout"] if item.get("display", "cutout") == "cutout" else hero["photo"], className="item-card-image"), html.Div([html.Strong(item.get("title", "Untitled item")), html.Small(f"{size} · {item.get('dimension_source', 'unscaled')}"), html.Small(f"Cutout: {hero.get('method', 'n/a')}", className="cutout-method")], className="item-card-copy")], className="item-card-head"),
         dcc.RadioItems(id={"type": "item-display", "index": item["id"]}, options=[{"label": "Cutout (background removed)", "value": "cutout"}, {"label": "Original seller photo", "value": "photo"}], value=item.get("display", "cutout"), inline=True, className="display-toggle"),
         html.Details([html.Summary(f"Listing photos & angles ({len(gallery)})"), html.Small("Tell Theia which side each photo shows; the 3D view switches to the real photo nearest your viewing angle.", className="control-note"), views], className="view-details"),
+        seller_message_panel(item),
         html.Button("Remove", id={"type": "remove-item", "index": item["id"]}, className="remove-item", n_clicks=0),
-    ], className="item-card")
+    ], className="item-card" + (" is-hearted" if item.get("hearted") else ""))
+
+
+def seller_message_panel(item: dict):
+    """Heart button + editable draft message. Theia never sends anything."""
+    hearted = bool(item.get("hearted"))
+    heart = html.Button("♥ Saved" if hearted else "♡ Love it", id={"type": "heart-item", "index": item["id"]}, n_clicks=0, className="heart-button" + (" on" if hearted else ""), title="Heart this item to save it and draft a message to the seller")
+    if not hearted:
+        return html.Div([heart, html.Small("Heart it to get a ready-to-send message for the seller.", className="control-note")], className="seller-panel")
+    message = item.get("seller_message") or {}
+    actions = [
+        html.Button("Copy message", id={"type": "copy-msg", "index": item["id"]}, n_clicks=0, className="secondary-button small-button"),
+        html.Button("Try another wording", id={"type": "redraft-msg", "index": item["id"]}, n_clicks=0, className="clear-button small-button"),
+    ]
+    if item.get("listing_url"):
+        actions.append(html.A("Open listing on Facebook ↗", href=item["listing_url"], target="_blank", rel="noopener noreferrer", className="listing-link"))
+    return html.Div([
+        heart,
+        html.P("MESSAGE TO THE SELLER", className="eyebrow seller-eyebrow"),
+        dcc.Textarea(id={"type": "seller-msg", "index": item["id"]}, value=message.get("text", ""), className="seller-message", rows=4),
+        html.Div(actions, className="seller-actions"),
+        html.Small(f"Drafted by {message.get('source', 'Theia')}. Edit anything, then copy it into Messenger. Theia never sends messages for you.", className="control-note"),
+    ], className="seller-panel")
+
+
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input({"type": "heart-item", "index": ALL}, "n_clicks"), State("item-library-data", "data"), prevent_initial_call=True)
+def toggle_heart(clicks, items):
+    if not ctx.triggered_id or not items or not any(clicks or []):
+        return no_update
+    item_id = ctx.triggered_id["index"]
+    updated = []
+    for item in items:
+        if item.get("id") == item_id:
+            hearted = not item.get("hearted")
+            item = {**item, "hearted": hearted}
+            if hearted and not (item.get("seller_message") or {}).get("text"):
+                item["seller_message"] = draft_seller_message(item)
+            log_pipeline({"stage": "heart", "hearted": hearted})
+        updated.append(item)
+    return updated
+
+
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input({"type": "redraft-msg", "index": ALL}, "n_clicks"), State("item-library-data", "data"), prevent_initial_call=True)
+def redraft_message(clicks, items):
+    if not ctx.triggered_id or not items or not any(clicks or []):
+        return no_update
+    item_id = ctx.triggered_id["index"]
+    updated = []
+    for item in items:
+        if item.get("id") == item_id:
+            attempt = int((item.get("seller_message") or {}).get("attempt", 0)) + 1
+            item = {**item, "seller_message": {**draft_seller_message(item, redraft=attempt), "attempt": attempt}}
+        updated.append(item)
+    return updated
+
+
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input({"type": "seller-msg", "index": ALL}, "n_blur"), State({"type": "seller-msg", "index": ALL}, "value"), State("item-library-data", "data"), prevent_initial_call=True)
+def save_message_edit(_, values, items):
+    if not ctx.triggered_id or not items:
+        return no_update
+    item_id = ctx.triggered_id["index"]
+    value = next((entry.get("value") for entry in ctx.states_list[0] if entry["id"]["index"] == item_id), None)
+    current = next((item for item in items if item.get("id") == item_id), None)
+    if current is None or value is None or (current.get("seller_message") or {}).get("text") == value:
+        return no_update
+    return [{**item, "seller_message": {**(item.get("seller_message") or {}), "text": value[:1000], "source": "you (edited)"}} if item.get("id") == item_id else item for item in items]
+
+
+app.clientside_callback(
+    """function(clicks, values) {
+        const trig = window.dash_clientside.callback_context.triggered_id;
+        const ids = window.dash_clientside.callback_context.outputs_list.map(o => o.id.index);
+        if (!trig) { return ids.map(() => window.dash_clientside.no_update); }
+        const i = ids.indexOf(trig.index);
+        if (i >= 0 && navigator.clipboard) { navigator.clipboard.writeText(values[i] || ''); }
+        return ids.map((id, k) => k === i ? 'Copied ✓' : 'Copy message');
+    }""",
+    Output({"type": "copy-msg", "index": ALL}, "children"), Input({"type": "copy-msg", "index": ALL}, "n_clicks"), State({"type": "seller-msg", "index": ALL}, "value"), prevent_initial_call=True,
+)
 
 
 @app.callback(Output("stage", "children"), Output("item-details", "children"), Output("metrics", "children"), Output("item-library", "children"), Output("item-select", "options"), Output("item-select", "value"), Input("room-state", "data"), Input("item-library-data", "data"), Input("room-calibration", "data"), State("item-select", "value"))
@@ -752,7 +832,7 @@ def render_preview(room, items, calibration, selected):
     details = html.Div([item_card(item) for item in items], className="item-cards")
     library_view = html.Div([
         html.Div([html.P("ITEMS IN THIS ROOM", className="eyebrow"), html.Small(f"{len(items)} saved this session", className="library-help")], className="library-heading"),
-        html.Div([html.Div([html.Img(src=item["src"]), html.Span(item.get("title", "Untitled item"))], className="saved-item") for item in items], className="saved-item-grid")
+        html.Div([html.Div([html.Img(src=item["src"]), html.Span(("♥ " if item.get("hearted") else "") + item.get("title", "Untitled item"))], className="saved-item" + (" is-hearted" if item.get("hearted") else "")) for item in items], className="saved-item-grid")
     ], className="library-inner") if items else html.Small("Added items will collect here for this session.", className="library-empty")
     options = [{"label": item.get("title", "Untitled item"), "value": item["id"]} for item in items]
     ids = [item["id"] for item in items]

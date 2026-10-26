@@ -59,3 +59,12 @@ body{background:var(--paper);font-family:'DM Sans',Arial,sans-serif;color:var(--
 .floor-outline{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .floor-outline polygon{fill:rgba(185,110,78,.12);stroke:#fff;stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-dasharray:5 4;filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
 .floor-outline polygon.open{fill:none}
+/* Heart + seller message */
+.seller-panel{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:8px}
+.heart-button{align-self:flex-start;border:1px solid #e3b48f;background:#fff;color:#b5523b;font:600 12px 'DM Sans',Arial,sans-serif;padding:7px 12px;cursor:pointer;border-radius:999px;transition:.15s}
+.heart-button:hover{background:#fff1ea}.heart-button.on{background:#c0533d;border-color:#c0533d;color:#fff}
+.seller-eyebrow{margin:4px 0 0}.seller-message{width:100%;min-height:92px;border:1px solid var(--line);padding:10px 12px;font:13px/1.5 'DM Sans',Arial,sans-serif;color:var(--ink);background:#fff;resize:vertical}
+.seller-message:focus{outline:2px solid var(--mint);border-color:var(--green)}
+.seller-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.small-button{width:auto;padding:8px 12px;font-size:11px;margin:0}
+.listing-link{font-size:11px;color:var(--green);font-weight:600;text-decoration:none}.listing-link:hover{text-decoration:underline}
+.item-card.is-hearted{border-color:#e3b48f}.saved-item.is-hearted span{color:#b5523b}

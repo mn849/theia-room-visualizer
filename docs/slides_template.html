@@ -23,7 +23,7 @@
 <table><tr><th>Existing</th><th>Limitation</th></tr><tr><td>IKEA Kreativ, Wayfair / Amazon "View in Room", Houzz</td><td>Only their own catalogue items with a pre-made 3D model</td></tr><tr><td>Planner 5D, RoomSketcher</td><td>Draw by hand; your piece becomes a generic block</td></tr><tr><td>ChatGPT / image generators</td><td>Redraw the item and room; no trustworthy scale</td></tr></table>
 <p style="font-size:.8em"><b>Theia:</b> any listing → faithful cutout of the seller's photo → one room photo rebuilt in 3D → seller dimensions in metres → every number labelled with its source.</p></section>
 
-<section><p class="k">03 · How the agents work</p><h2>One narrow LLM agent, four deterministic tools</h2>
+<section><p class="k">03 · How the agents work</p><h2>Two narrow LLM agents, four deterministic tools</h2>
 <svg viewBox="0 0 900 300" width="100%" font-family="Arial" font-size="15"><defs><marker id="a" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#b96e4e"/></marker></defs>
 <rect x="5" y="40" width="160" height="60" fill="#e4e9e0" stroke="#1e5a4c"/><text x="85" y="76" text-anchor="middle">Listing URL</text>
 <rect x="5" y="200" width="160" height="60" fill="#e4e9e0" stroke="#1e5a4c"/><text x="85" y="236" text-anchor="middle">Room photo</text>
@@ -36,7 +36,7 @@
 <rect x="725" y="105" width="170" height="90" fill="#e4e9e0" stroke="#1e5a4c"/><text x="810" y="145" text-anchor="middle" font-weight="bold">2D / 3D viewer</text><text x="810" y="168" text-anchor="middle">drag · snap · orbit</text>
 <path d="M165 70 H215" stroke="#b96e4e" stroke-width="2.5" marker-end="url(#a)"/><path d="M165 70 Q195 70 195 90 H215" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/><path d="M165 70 Q190 70 190 150 H215" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/><path d="M165 230 H215" stroke="#b96e4e" stroke-width="2.5" marker-end="url(#a)"/><path d="M165 230 Q195 230 195 275 H215" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/>
 <path d="M455 30 Q495 30 510 120" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/><path d="M455 90 Q490 90 510 135" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/><path d="M455 150 H510" stroke="#b96e4e" stroke-width="2.5" marker-end="url(#a)"/><path d="M455 225 Q490 225 510 175" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/><path d="M455 275 Q500 275 510 190" stroke="#b96e4e" stroke-width="2.5" fill="none" marker-end="url(#a)"/><path d="M680 150 H715" stroke="#b96e4e" stroke-width="2.5" marker-end="url(#a)"/></svg>
-<p class="small">The LLM never sees pixels and can't set dimensions. Cutouts and 3D use 0 tokens.</p></section>
+<p class="small">The LLM never sees pixels and can't set dimensions. ♡ on an item → a second agent drafts a 2–4 sentence message to the seller (the user sends it). Cutouts and 3D use 0 tokens.</p></section>
 
 <section><p class="k">04 · Demo</p><h2>Your room, the seller's item, any angle</h2>
 <div class="cols">{{slideshot:photo-view}}{{slideshot:orbit-view}}</div>
