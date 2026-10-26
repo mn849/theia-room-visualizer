@@ -377,9 +377,10 @@
       }
     }
     const base = new THREE.Vector3(pc.position.x, 0, pc.position.z);
-    const sideways = ((index % 3) - 1) * 0.9;
+    // Up to 15 items: rows of five, each row a little further back.
+    const sideways = ((index % 5) - 2) * 0.75;
     let p = null;
-    for (let dist = item.pose === 'flat' ? 2.0 : 2.4; dist >= 1.0; dist -= 0.2) {
+    for (let dist = (item.pose === 'flat' ? 2.0 : 2.4) + Math.floor(index / 5) * 0.9; dist >= 1.0; dist -= 0.2) {
       const q = base.clone().add(fwd.clone().multiplyScalar(dist)).add(right.clone().multiplyScalar(sideways));
       const candidate = { x: q.x, z: q.z, yaw: facing, y: item.pose === 'wall' ? 1.0 : 0 };
       if (footprintInside(entry, candidate)) { p = candidate; break; }

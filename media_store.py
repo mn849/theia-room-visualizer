@@ -4,7 +4,7 @@ Browser session storage is limited to roughly 5 MB, which forced earlier
 versions of Theia to shrink every listing photo to 800 px. Full-resolution
 images now live on the server under unguessable random names and only a short
 ``/media/<id>`` URL is stored in the browser session. Files older than
-``THEIA_MEDIA_TTL_HOURS`` (default 24 h) are purged so private room photos are
+``THEIA_MEDIA_TTL_HOURS`` (default 7 days) are purged so private room photos are
 not retained indefinitely.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ from PIL import Image
 
 PROJECT_DIR = Path(__file__).resolve().parent
 MEDIA_DIR = Path(os.getenv("THEIA_MEDIA_DIR", PROJECT_DIR / "data" / "media"))
-TTL_HOURS = float(os.getenv("THEIA_MEDIA_TTL_HOURS", "24"))
+TTL_HOURS = float(os.getenv("THEIA_MEDIA_TTL_HOURS", "168"))  # 7 days, so saved rooms/items keep working
 _NAME = re.compile(r"^[0-9a-f]{32}\.(png|jpg|bin)$")
 
 

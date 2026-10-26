@@ -52,8 +52,20 @@
       overlay.addEventListener('pointerup', function (event) {
         if (overlay.hasPointerCapture(event.pointerId)) overlay.releasePointerCapture(event.pointerId);
         applyDepthScale(overlay);
+        savePosition(overlay);
       });
     });
+  }
+  // Remember where each item was dragged so adding another item (which
+  // re-renders the preview) never moves the items already in the room.
+  const positions = {};
+  function savePosition(overlay) {
+    let id = null;
+    try { id = JSON.parse(overlay.id).index; } catch (e) { return; }
+    positions[id] = { left: overlay.style.left, top: overlay.style.top };
+    if (window.dash_clientside && window.dash_clientside.set_props) {
+      window.dash_clientside.set_props('overlay-positions', { data: Object.assign({}, window.__theiaPositions || {}, positions) });
+    }
   }
   const observer = new MutationObserver(wireDrag);
   observer.observe(document.body, { childList: true, subtree: true });

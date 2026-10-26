@@ -63,13 +63,17 @@ def empty_stage():
     ], className="empty-preview")
 
 
-def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[float]] | None = None):
+def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[float]] | None = None, positions: dict | None = None):
     if not room_src:
         return empty_stage()
     children = [html.Img(src=room_src, className="room-image")]
     for index, item in enumerate(items):
         pose = item.get("pose", "upright")
-        top = "48%" if pose == "flat" else ("42%" if pose == "wall" else f"{35 + (index // 3) * 10}%")
+        # Default grid (5 across, 3 rows) so 15 items never stack on top of
+        # each other; a position the user dragged to is remembered.
+        saved = (positions or {}).get(item["id"]) or {}
+        left = saved.get("left") or f"{6 + (index % 5) * 18}%"
+        top = saved.get("top") or ("48%" if pose == "flat" else ("42%" if pose == "wall" else f"{30 + (index // 5) * 14}%"))
         if pose == "flat":
             transform = f"perspective(650px) rotateX(62deg) rotateZ({90 + item.get('rotation', 0)}deg)"
         else:
@@ -80,7 +84,7 @@ def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[
             html.Img(src=item["src"], className="item-image"), html.Span("Drag me", className="drag-hint")
         ], id={"type": "item-overlay", "index": item["id"]}, className="item-overlay", draggable="false", **{
             "data-base-width": f"{item.get('visual_scale', 0.22) * 100:.3f}",
-            "style": {"width": f"{item.get('visual_scale', 0.22) * 100:.1f}%", "left": f"{25 + (index % 3) * 22}%", "top": top, "transform": transform}
+            "style": {"width": f"{item.get('visual_scale', 0.22) * 100:.1f}%", "left": left, "top": top, "transform": transform}
         }))
     stage_props = {"id": "room-stage", "className": "room-stage"}
     if floor_points and len(floor_points) == 4:
@@ -314,6 +318,7 @@ def stitch_room_images(images: list[str]) -> tuple[str, str]:
     return f"data:image/jpeg;base64,{base64.b64encode(output.getvalue()).decode()}", f"{len(images)} angles stitched into a panorama"
 
 
+MAX_ITEMS = 15  # items shown together in one room; more is cluttered and slow
 VIEW_ANGLES = {"front": 0, "front-right": 45, "right": 90, "back": 180, "left": -90, "front-left": -45}
 VIEW_LABELS = [{"label": "Front (main photo)", "value": "front"}, {"label": "Seen from front-left", "value": "front-left"}, {"label": "Seen from the left", "value": "left"}, {"label": "Seen from front-right", "value": "front-right"}, {"label": "Seen from the right", "value": "right"}, {"label": "Back", "value": "back"}, {"label": "Not an item view", "value": "none"}]
 _scene_cache: dict[str, dict] = {}
@@ -394,13 +399,15 @@ def build_room_scene(room: dict, calibration: dict | None) -> dict | None:
 
 
 app.layout = html.Div([
-    dcc.Store(id="room-state", data={"src": None, "filename": None}),
-    dcc.Store(id="room-library-data", storage_type="session", data=[]),
+    dcc.Store(id="room-state", storage_type="local", data={"src": None, "filename": None}),
+    dcc.Store(id="room-library-data", storage_type="local", data=[]),
     dcc.Store(id="floor-points", data=[]),
-    dcc.Store(id="room-calibration", storage_type="session", data={"dimensions_m": {"width_m": 4.0, "length_m": 4.0, "height_m": 2.5}, "source": "default residential-room reference"}),
-    dcc.Store(id="item-library-data", storage_type="session", data=[]),
+    dcc.Store(id="room-calibration", storage_type="local", data={"dimensions_m": {"width_m": 4.0, "length_m": 4.0, "height_m": 2.5}, "source": "default residential-room reference"}),
+    dcc.Store(id="item-library-data", storage_type="local", data=[]),
+    dcc.Store(id="overlay-positions", storage_type="local", data={}),
+    dcc.Store(id="positions-sink", data=None),
     dcc.Store(id="scene-data", data=None),
-    dcc.Store(id="item-placements", storage_type="session", data={}),
+    dcc.Store(id="item-placements", storage_type="local", data={}),
     dcc.Store(id="scene-sink", data=None),
     html.Header([
         html.Div([html.Div([html.Span(className="theia-eye"), html.Span(className="theia-glint")], className="brand-mark"), html.Div([
@@ -541,6 +548,8 @@ def calibrate_room(_, measurement_type, measurement, unit, calibration):
 def add_item(_, listing_url, image_url, upload_contents, library):
     if not listing_url and not image_url and not upload_contents:
         return no_update, "Add a listing URL, direct image URL, or screenshot first."
+    if len(library or []) >= MAX_ITEMS:
+        return no_update, f"Your room already has {MAX_ITEMS} items, the most Theia can show at once. Remove an item below (or clear saved items) before adding a new one."
     if listing_url:
         host = urlparse(listing_url).netloc.lower()
         if not (host.endswith("facebook.com") or host.endswith("fb.com")):
@@ -585,7 +594,7 @@ def add_item(_, listing_url, image_url, upload_contents, library):
         agent_note += " · " + "; ".join(agent_result["flags"][:2])
     item = {"id": f"item-{uuid4().hex[:8]}", "src": hero["cutout"], "original_src": hero["photo"], "display": "cutout" if hero["cutout_ok"] else "photo", "gallery": gallery, "title": title, "raw_description": description, "listing_url": listing_url, "source_note": note + agent_note, "dimensions": dimensions, "dimension_source": dimension_source, "dimension_confidence": dimension_confidence, "visual_scale": visual_scale, "pose": pose, "rotation": 0, "agent": agent_result}
     updated = [item] + (library or [])
-    return updated[:12], f"Added {title}. Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
+    return updated[:MAX_ITEMS], f"Added {title} ({len(updated)} of {MAX_ITEMS} items in this room). Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
 
 
 @app.callback(Output("item-library-data", "data", allow_duplicate=True), Output("item-note", "children", allow_duplicate=True), Input("clear-items", "n_clicks"), prevent_initial_call=True)
@@ -688,6 +697,11 @@ def update_scene(room, calibration, items):
     ]
     return {"room": room_payload, "items": [item_for_scene(item) for item in items or []]}, notes
 
+
+app.clientside_callback(
+    "function(data) { window.__theiaPositions = data || {}; return window.dash_clientside.no_update; }",
+    Output("positions-sink", "data"), Input("overlay-positions", "data"),
+)
 
 app.clientside_callback(
     """function(scene, placements, selected, mode) {
@@ -828,8 +842,8 @@ app.clientside_callback(
 )
 
 
-@app.callback(Output("stage", "children"), Output("item-details", "children"), Output("metrics", "children"), Output("item-library", "children"), Output("item-select", "options"), Output("item-select", "value"), Input("room-state", "data"), Input("item-library-data", "data"), Input("room-calibration", "data"), State("item-select", "value"))
-def render_preview(room, items, calibration, selected):
+@app.callback(Output("stage", "children"), Output("item-details", "children"), Output("metrics", "children"), Output("item-library", "children"), Output("item-select", "options"), Output("item-select", "value"), Input("room-state", "data"), Input("item-library-data", "data"), Input("room-calibration", "data"), State("item-select", "value"), State("overlay-positions", "data"))
+def render_preview(room, items, calibration, selected, positions):
     room_src, items = (room or {}).get("src"), items or []
     migrated_items = []
     for item in items:
@@ -843,13 +857,13 @@ def render_preview(room, items, calibration, selected):
     items = [{**item, "visual_scale": max(0.08, min(0.72, (item.get("dimensions", {}).get("height_m", 1.0) / room_dimensions["height_m"]) if (calibration or {}).get("source", "").endswith("height") else item.get("dimensions", {}).get("width_m", 1.0) / room_width_m))} for item in items]
     details = html.Div([item_card(item) for item in items], className="item-cards")
     library_view = html.Div([
-        html.Div([html.P("ITEMS IN THIS ROOM", className="eyebrow"), html.Small(f"{len(items)} saved this session", className="library-help")], className="library-heading"),
+        html.Div([html.P("ITEMS IN THIS ROOM", className="eyebrow"), html.Small(f"{len(items)} of {MAX_ITEMS} · saved on this device", className="library-help")], className="library-heading"),
         html.Div([html.Div([html.Img(src=item["src"]), html.Span(("♥ " if item.get("hearted") else "") + item.get("title", "Untitled item"))], className="saved-item" + (" is-hearted" if item.get("hearted") else "")) for item in items], className="saved-item-grid")
     ], className="library-inner") if items else html.Small("Added items will collect here for this session.", className="library-empty")
     options = [{"label": item.get("title", "Untitled item"), "value": item["id"]} for item in items]
     ids = [item["id"] for item in items]
     value = selected if selected in ids else (ids[0] if ids else None)
-    return room_stage(room_src, items, (room or {}).get("floor_points")), details, [
+    return room_stage(room_src, items, (room or {}).get("floor_points"), positions), details, [
         metric("ROOM", "Ready" if room_src else "Not added", (room or {}).get("correction", "Upload room angles")),
         metric("ITEMS", str(len(items)), "Placed together" if items else "Add a listing"), metric("SCALE", "Automatic" if items else "Waiting", f"{(calibration or {}).get('source', 'default reference')} · {room_width_m:.2f} m width · {room_dimensions['height_m']:.2f} m height"),
     ], library_view, options, value
