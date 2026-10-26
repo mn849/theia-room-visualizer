@@ -26,7 +26,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <strong>Repository:</strong> {{repo}}<br>
 <strong>Run it:</strong> double-click <code>Start Theia.command</code> (Mac) or <code>python app.py</code>, then open <code>http://127.0.0.1:8050</code>. The README has the full steps.<br>
 <strong>One sentence:</strong> Theia reads a Marketplace listing, cuts the item out of the seller's own photo, reconstructs your room photo as a 3D space, and lets you place, rotate and walk around the item at its stated dimensions.</div>
-{{shot:multi-items|Theia in use: a real room photo with three Marketplace items (a birdcage on a stand and a pair of side tables split into two separate, movable pieces). The selected item has a dashed outline.}}
+{{shot:view-2d|Theia in use: a real Facebook Marketplace bench, cut out of the seller's own photo and standing on the floor of a real room photo, at its seller-stated size.}}
 <div class="grid3">
 <div class="card"><div class="metric">1 agent call</div>per new listing (cached on repeats, capped per hour)</div>
 <div class="card"><div class="metric">0 tokens</div>for cutouts, 3D reconstruction, dragging and walking (all local)</div>
@@ -129,7 +129,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 {{shot:item-card|Items in the room and the Orientation panel: pose, rotation slider, and the item card with the cutout method and a switch back to the untouched seller photo.}}
 <p><strong>Step 4b: heart the item.</strong> The seller-message agent drafts a short, natural first message. The user can edit it, try another wording, copy it, and open the listing to send it in Messenger.</p>
 <p><strong>Step 5: try it in 2D.</strong> The default 2D mode keeps the original photo and lets the user drag and rotate the cutout over it, which is fast for a first look.</p>
-{{shot:view-2d|2D photo mode: the bench cutout standing on the floor of the room photo.}}
+{{img:docs/figures/real_bench_cutout.png|The same bench: the seller's photo, a standard background-removal model (seat ghosted), and Theia's faithful cutout used in the room.}}
 <p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The view opens at the photo's own viewpoint, so it first looks exactly like the photo, with the bench standing on open floor about 2.4 m away and facing you. You then walk through the room: drag to look around, scroll or W/S to walk, A/D to step sideways. Movement is kept within about 2 m of where the photo was taken, because a single photo can only be reprojected convincingly near its own viewpoint. Earlier versions had separate Photo, Orbit and Top views; testing showed one walk-through mode was easier to understand. The user can drag it, rotate it with Q/E and orbit around it.</p>
 {{shot:photo-view|The 3D room rebuilt from one photo (an earlier test build): the photo is projected onto a floor and wall model. Moving away from the photo's own viewpoint reveals unphotographed surfaces in plain beige, which is why walking is limited to about 2 m.}}
 

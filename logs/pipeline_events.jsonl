@@ -154,3 +154,4 @@
 {"timestamp": "2026-10-26T21:42:29.699178+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
 {"timestamp": "2026-10-26T21:42:29.699778+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
 {"timestamp": "2026-10-26T21:42:29.701246+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
+{"timestamp": "2026-10-26T21:56:07.451118+00:00", "stage": "user_size", "factor": 1.0}
