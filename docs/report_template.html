@@ -200,7 +200,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <!-- 7 · IMPACT -->
 <section class="pb">
 <p class="kicker">7 · Impact</p>
-<h2>From a 15-minute photo edit to a 2-minute, trustworthy preview</h2>
+<h2>A trustworthy preview that made a real buyer more likely to purchase</h2>
 <h3>Quality: the item now looks like the item</h3>
 <p>The most important problem we fixed is the one users noticed first: the old cutout pipeline stripped detail out of items. It downscaled photos twice to 800 px, forced soft edges to hard on/off, painted the wall into the gaps between spindles with a gap-filling filter, and its fallback erased thin legs. The new pipeline keeps 1600 px and soft edges, restores pale upholstery, and clears only regions that match the wall colour at the same height in the photo.</p>
 {{img:docs/figures/cutout_before_after.png|Same test photo through both pipelines. Before: wall visible between the spindles and under the seat is kept as part of the bench. After: gaps are transparent while the cream seat and thin legs are kept. (Generated test image so both pipelines see identical input; real listings behave the same way. See the user test below.)}}
@@ -219,8 +219,8 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <h3>A real user</h3>
 {{user_evidence}}
 <h3>What this means at scale</h3>
-<p>If Theia saves a buyer even one wrong pick-up per apartment hunt, that's roughly an hour of driving and carrying plus a resale loss, and it costs about a cent in model tokens per user per month. The bigger value is less measurable: buyers can act faster on good listings because they no longer have to wait for the seller to reply with measurements.</p>
-<p class="small">The time and pick-up figures are estimates from our own use and the user test above, not a controlled study.</p>
+<p>If Theia saves a buyer even one wrong pick-up per apartment hunt, that's roughly an hour of driving and carrying plus a resale loss, and it costs about two cents in model tokens per user per month. Our one test user said Theia made him more likely to buy on Marketplace, which is the behaviour change that matters to both buyers and sellers. The ♥ seller message also removes the first hurdle of contacting a seller.</p>
+<p class="small">The pick-up figure is our own estimate, and the user evidence is a single informal session, not a controlled study.</p>
 </section>
 
 <!-- 8 · LIMITS -->
