@@ -71,6 +71,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <li><strong>Works on any listing.</strong> It reads public Marketplace metadata and seller dimensions, or a screenshot or image URL. No catalogue model is needed.</li>
 <li><strong>Keeps the item faithful.</strong> Theia only removes background. Every item pixel is the seller's own, and one click switches back to the untouched photo. Sides no photo shows are drawn as a grey silhouette, not generated.</li>
 <li><strong>Builds 3D from one ordinary photo.</strong> It recovers the camera height, tilt and lens, the floor plane and the walls from a single room photo, so items stand upright, sit flush against walls and shrink correctly with distance. You can orbit, pan and zoom around them.</li>
+<li><strong>2D or 3D, the user chooses.</strong> The quick 2D mode drags the item over the photo. The 3D mode opens at the photo's own viewpoint and lets you walk around. Both use the same faithful cutouts and seller dimensions.</li>
 <li><strong>Shows its evidence.</strong> Every number says where it came from: seller-stated, category estimate, EXIF lens, clicked floor corners, or an assumed phone height.</li>
 </ul>
 <p class="small">Honest caveat: we compared against these products from their public descriptions and our own use, not a formal benchmark. Some of them do render better when a catalogue 3D model exists. Theia's advantage is coverage of one-off secondhand items and trustworthiness, not visual polish.</p>
@@ -122,19 +123,21 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <pre><code>{{log:agent}}</code></pre>
 <p><strong>Step 4: cutout.</strong> Each gallery photo is cut out. The main photo is the "front" view, and the others can be tagged as left, right or back.</p>
 {{shot:item-card|Item card: switch between the cutout and the untouched seller photo, and tag which side each listing photo shows.}}
-<p><strong>Step 5: the 3D scene.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The bench is placed flush against the back wall, facing into the room. The user can drag it, rotate it with Q/E and orbit around it.</p>
+<p><strong>Step 5: try it in 2D.</strong> The default 2D mode keeps the original photo and lets the user drag and rotate the cutout over it, which is fast for a first look.</p>
+{{shot:view-2d|2D photo mode: the cutout dragged over the room photo.}}
+<p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The bench is placed flush against the back wall, facing into the room. The user can drag it, rotate it with Q/E and orbit around it.</p>
 {{shot:orbit-view|Orbit view: the same item seen from another angle; Theia shows the listing photo nearest this viewing angle.}}
 {{shot:top-view|Top view: the item footprint against the room's walls; a red outline would mean it does not fit.}}
 
 <h3>4.2 How one photo becomes a 3D room</h3>
 <ol>
 <li><strong>Lens.</strong> The focal length comes from EXIF (35 mm-equivalent). If that's missing, it comes from the clicked corners: a rectangle's two vanishing directions must be perpendicular. If that fails too, we assume a typical 26 mm phone lens.</li>
-<li><strong>Floor and camera.</strong> With four clicked corners we solve a homography from the floor rectangle to the image, which gives the floor's orientation relative to the camera. Without clicks, we find straight vertical edges (door frames, wall corners, furniture legs), robustly fit their common vanishing point (RANSAC), and get the camera's tilt and roll from it.</li>
+<li><strong>Floor and camera.</strong> Four clicked corners give a homography from the floor rectangle to the image, and from it the floor's orientation and extent. Hand clicks are rarely a perfect rectangle, so when the photo has enough straight vertical edges we take the tilt and roll from those instead and use the clicks only for where the floor and walls are. Without clicks, we likewise find straight vertical edges (door frames, wall corners, furniture legs), robustly fit their common vanishing point (RANSAC), and get the camera's tilt and roll from it.</li>
 <li><strong>Scale.</strong> Your confirmed room width if you entered one; otherwise a 1.45 m phone height. The app always tells you which it used.</li>
 <li><strong>Room box.</strong> The far edge of the clicked floor is the back wall and the sides are the side walls, at the ceiling height you set. The photo is projected back onto these surfaces, so the opening view reproduces the original photo exactly.</li>
 <li><strong>Depth (optional).</strong> A local depth network's relative depth is calibrated to metres using floor pixels whose true distance we know from step 2.</li>
 </ol>
-{{img:docs/figures/geometry_recovery.png|Test on a computer-generated room with a known camera: from the four orange clicks Theia recovers the camera height (1.40 m), tilt (−12.0°) and roll (1.5°) exactly. It then places a 1.2 m bench flush against the back wall and a 0.9 m chair against the right wall, in correct perspective. Before this work, items were flat cutouts pasted at a fixed screen position and resized by a rough depth rule.}}
+{{img:docs/figures/geometry_recovery.png|Test on a computer-generated room with a known camera: from the four orange clicks Theia recovers the camera height (1.40 m), tilt (−12.0°) and roll (1.5°) exactly. It then places a 1.2 m bench flush against the back wall and a 0.9 m chair against the right wall, in correct perspective. Before this work, items were flat cutouts pasted at a fixed screen position and resized by a rough depth rule. That flat placement is still available as the quick 2D mode.}}
 </section>
 
 <!-- 5 · TOKENOMICS -->
