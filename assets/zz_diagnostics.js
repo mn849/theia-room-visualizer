@@ -45,6 +45,8 @@
     }
     const container = document.getElementById('scene3d');
     if (container) snap.scene3dDisplay = getComputedStyle(container).display;
+    snap.sceneDataItems = window.__theiaSceneItems === undefined ? 'never-called' : window.__theiaSceneItems;
+    snap.threeLoaded = !!(window.TheiaScene && window.TheiaScene.debug && window.TheiaScene.debug());
     try {
       const st = window.TheiaScene && window.TheiaScene.debug();
       if (st && st.data) {

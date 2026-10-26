@@ -604,7 +604,10 @@ def add_item(_, listing_url, image_url, upload_contents, library):
     agent_result = analyze_listing(title, description)
     room_prior_m = 4.0
     visual_scale = max(0.08, min(0.72, dimensions.get("width_m", 1.0) / room_prior_m))
-    pose = "flat" if any(word in f"{title} {description}".lower() for word in ("rug", "carpet", "runner", "mat")) else agent_result.get("pose", "upright")
+    # Whole words only: "mat" used to match "material", "format", "automatic",
+    # which laid ordinary furniture (e.g. a birdcage stand) flat on the floor.
+    rug_words = re.search(r"\b(rugs?|carpets?|runners?|mats?|doormats?)\b", title.lower())
+    pose = "flat" if rug_words else agent_result.get("pose", "upright")
     agent_note = f" · agent: {agent_result.get('category', 'other')}"
     if agent_result.get("flags"):
         agent_note += " · " + "; ".join(agent_result["flags"][:2])
@@ -711,7 +714,14 @@ def update_scene(room, calibration, items):
         f"camera {scene['camera_height_m']:.2f} m above the floor, tilted {scene['camera']['pitch_deg']:.1f}°, roll {scene['camera']['roll_deg']:.1f}° · lens from {scene['focal_source']} · floor from {scene['layout_source']} · room ≈ {scene['room_width_m']:.2f} m wide. ",
         *[html.Span(note + " ") for note in scene["notes"]],
     ]
-    return {"room": room_payload, "items": [item_for_scene(item) for item in items or []]}, notes
+    scene_items = []
+    for item in items or []:
+        try:
+            scene_items.append(item_for_scene(item))
+        except Exception as exc:  # one bad item must not hide the others
+            log_pipeline({"stage": "scene_item", "error": type(exc).__name__, "detail": str(exc)[:200]})
+    log_pipeline({"stage": "scene_items", "library": len(items or []), "in_scene": len(scene_items)})
+    return {"room": room_payload, "items": scene_items}, notes
 
 
 app.clientside_callback(

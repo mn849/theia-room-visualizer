@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 data/media/
 models/*.onnx
+logs/server.log
+logs/client_diagnostics.jsonl

@@ -712,6 +712,7 @@
   window.TheiaScene = {
     update: function (scene, placements, selected, mode) {
       pending = { scene: scene, placements: placements, selected: selected, mode: mode || '2d' };
+      window.__theiaSceneItems = scene && scene.items ? scene.items.length : null;
       if (pending.mode !== '3d' && !THREE) { render(); return; }
       loadThree().then(render);
     },

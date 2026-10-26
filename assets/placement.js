@@ -25,7 +25,10 @@
       const factor = Math.max(0.42, Math.min(1.75, 0.42 + depth * 1.33));
       overlay.style.width = (base * factor) + '%';
       const updatedHeight = overlay.offsetHeight;
-      overlay.style.top = ((bottom - updatedHeight) / stageBox.height * 100) + '%';
+      // Keep the whole item inside the preview (flat items used to slide
+      // below the bottom edge and disappear).
+      const clampedTop = Math.max(0, Math.min(stageBox.height - updatedHeight, bottom - updatedHeight));
+      overlay.style.top = (clampedTop / stageBox.height * 100) + '%';
     }
     stage.querySelectorAll('.item-overlay').forEach(function (overlay) {
       if (overlay.dataset.wired === 'true') return;
