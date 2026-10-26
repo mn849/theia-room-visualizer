@@ -16,7 +16,7 @@
  */
 (function () {
   'use strict';
-  const PHOTO_HOLD_DEG = 35;      // keep a listing photo fixed within this angle
+  const PHOTO_HOLD_DEG = 75;      // the photo turns with the item up to this angle, then eases toward you
   const BACK_START_DEG = 115;     // beyond this, no real photo shows that side
   const SNAP_DISTANCE = 0.3;      // metres from a wall to snap flush
   const VIEW_ANGLES = { front: 0, 'front-right': 45, right: 90, back: 180, left: -90, 'front-left': -45 };
@@ -395,7 +395,7 @@
   // A saved placement is only reused if it is still in front of the camera
   // and on the floor (older sessions could leave items far away).
   function placementUsable(entry, p) {
-    if (!p) return false;
+    if (!p || typeof p.x !== 'number' || typeof p.z !== 'number') return false;
     const pc = state.photoCam;
     const dx = p.x - pc.position.x, dz = p.z - pc.position.z;
     if (Math.hypot(dx, dz) > 7) return false;
@@ -420,7 +420,8 @@
       state.itemGroup.add(entry.group);
       const existing = state.placements[item.id];
       if (!existing || existing.pose !== item.pose || !placementUsable(entry, existing)) {
-        state.placements[item.id] = Object.assign(defaultPlacement(entry, index), { pose: item.pose });
+        const keepYaw = existing && existing.x === undefined && typeof existing.yaw === 'number' ? { yaw: existing.yaw } : {};
+        state.placements[item.id] = Object.assign(defaultPlacement(entry, index), { pose: item.pose }, keepYaw);
       }
       applyPlacement(entry);
     });

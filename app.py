@@ -73,7 +73,9 @@ def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[
         if pose == "flat":
             transform = f"perspective(650px) rotateX(62deg) rotateZ({90 + item.get('rotation', 0)}deg)"
         else:
-            transform = f"rotate({item.get('rotation', 0)}deg)"
+            # Turn the item about its vertical axis (like turning furniture on
+            # the floor) rather than spinning the photo in the picture plane.
+            transform = f"perspective(900px) rotateY({item.get('rotation', 0)}deg)"
         children.append(html.Div([
             html.Img(src=item["src"], className="item-image"), html.Span("Drag me", className="drag-hint")
         ], id={"type": "item-overlay", "index": item["id"]}, className="item-overlay", draggable="false", **{
@@ -697,11 +699,17 @@ app.clientside_callback(
 
 app.clientside_callback(
     """function(rotation, selected, placements) {
-        if (!selected || !placements || !placements[selected]) { return window.dash_clientside.no_update; }
+        if (!selected) { return window.dash_clientside.no_update; }
+        // Instant feedback in the 2D view: turn the selected overlay now.
+        const overlay = document.getElementById(JSON.stringify({index: selected, type: 'item-overlay'}));
+        if (overlay && !overlay.style.transform.includes('rotateX')) {
+            overlay.style.transform = 'perspective(900px) rotateY(' + (rotation || 0) + 'deg)';
+        }
+        placements = placements || {};
         const yaw = (rotation || 0) * Math.PI / 180;
-        if (Math.abs((placements[selected].yaw || 0) - yaw) < 1e-4) { return window.dash_clientside.no_update; }
+        if (placements[selected] && Math.abs((placements[selected].yaw || 0) - yaw) < 1e-4) { return window.dash_clientside.no_update; }
         const next = JSON.parse(JSON.stringify(placements));
-        next[selected].yaw = yaw; next[selected].wall = null;
+        next[selected] = Object.assign({}, next[selected] || {}, {yaw: yaw, wall: null});
         return next;
     }""",
     Output("item-placements", "data", allow_duplicate=True), Input("item-rotation", "value"), State("item-select", "value"), State("item-placements", "data"), prevent_initial_call=True,
@@ -771,7 +779,11 @@ def toggle_heart(clicks, items):
             hearted = not item.get("hearted")
             item = {**item, "hearted": hearted}
             if hearted and not (item.get("seller_message") or {}).get("text"):
-                item["seller_message"] = draft_seller_message(item)
+                try:
+                    item["seller_message"] = draft_seller_message(item)
+                except Exception as exc:  # never lose the heart because drafting failed
+                    log_pipeline({"stage": "heart", "error": type(exc).__name__, "detail": str(exc)[:200]})
+                    item["seller_message"] = {"text": "Hi! Is this still available? I'd love to come and pick it up if so.", "source": "template (drafting error)"}
             log_pipeline({"stage": "heart", "hearted": hearted})
         updated.append(item)
     return updated
