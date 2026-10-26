@@ -26,7 +26,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <strong>Repository:</strong> {{repo}}<br>
 <strong>Run it:</strong> double-click <code>Start Theia.command</code> (Mac) or <code>python app.py</code>, then open <code>http://127.0.0.1:8050</code>. The README has the full steps.<br>
 <strong>One sentence:</strong> Theia reads a Marketplace listing, cuts the item out of the seller's own photo, reconstructs your room photo as a 3D space, and lets you place, rotate and walk around the item at its stated dimensions.</div>
-{{shot:photo-view|Theia's 3D preview opening at the exact viewpoint of the room photo, with a Marketplace item placed at its seller-stated size.}}
+{{shot:multi-items|Theia in use: a real room photo with three Marketplace items (a birdcage on a stand and a pair of side tables split into two separate, movable pieces). The selected item has a dashed outline.}}
 <div class="grid3">
 <div class="card"><div class="metric">1 agent call</div>per new listing (cached on repeats, capped per hour)</div>
 <div class="card"><div class="metric">0 tokens</div>for cutouts, 3D reconstruction, dragging and walking (all local)</div>
@@ -101,7 +101,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 </svg></div>
 <table>
 <tr><th>Component</th><th>What it does</th><th>Tools / inputs it may use</th></tr>
-<tr><td><strong>Listing agent</strong> (<code>listing_agent.py</code>)</td><td>Classifies the item (bench, mirror, rug…), picks a pose and raises warnings ("description truncated", "ambiguous item").</td><td>Only the delimited listing title (≤1,000 chars) and description (≤6,000 chars). No browsing, no image access, no write actions. Output is validated JSON.</td></tr>
+<tr><td><strong>Listing agent</strong> (<code>listing_agent.py</code>)</td><td>Classifies the item (bench, mirror, rug…), picks a pose, raises warnings ("description truncated", "ambiguous item"), and copies the seller's own stated measurements for one piece (e.g. 20.5″W × 15″D × 28″H).</td><td>Only the delimited listing title (≤1,000 chars) and description (≤6,000 chars). No browsing, no image access, no write actions. Output is validated JSON; a measurement is accepted only if every number literally appears in the listing text, so the model cannot invent a size.</td></tr>
 <tr><td><strong>Seller-message agent</strong> (<code>message_agent.py</code>)</td><td>When the user hearts an item, it drafts a 2–4 sentence first message to the seller that sounds like the user wrote it: it asks if the item is still available, asks for the missing measurement (e.g. depth) so the user can check the fit, and offers to pick it up.</td><td>Only the listing title (fenced, untrusted) and the seller-stated dimensions. It can't send anything: the user edits, copies and sends. The reply is rejected (with a template fallback) if it isn't 2–4 sentences, is over 480 characters, or contains links, emails, phone numbers or placeholders.</td></tr>
 <tr><td>Metadata + dimension parser</td><td>Reads Open Graph, JSON-LD and Marketplace bootstrap data; turns "24 inch w / 24.5 h / Seat height 18" or "36 CMT" into metres.</td><td>Public page HTML via one GET request; never logs in.</td></tr>
 <tr><td>Faithful cutout tool (<code>item_cutout.py</code>)</td><td>Removes the background from up to 5 listing photos at 1600 px, keeping soft edges; restores pale upholstery; clears wall visible between spindles and legs.</td><td>Best local segmentation model available (BiRefNet → ISNet → U²-Net), else GrabCut.</td></tr>
@@ -114,22 +114,19 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <h3>4.1 One real run, step by step</h3>
 <p>The run below uses a real listing, a vintage spindle-arm bench with floral tapestry, added to a real room photo. Log lines are copied from <code>logs/agent_calls.jsonl</code> and <code>logs/pipeline_events.jsonl</code>.</p>
 <p><strong>Step 1: upload the room.</strong> Theia corrects the EXIF orientation, reads the lens focal length when present, and caches the photo at full resolution on the server.</p>
-{{shot:room-upload|Room photo uploaded; the note confirms orientation correction and that the photo is saved for this session.}}
 <pre><code>{{log:room_upload}}</code></pre>
 <p><strong>Step 2: optionally click four floor corners.</strong> These define the floor rectangle, from which Theia recovers the camera's height, tilt, roll and (without EXIF) focal length.</p>
-{{shot:floor-corners|The four labelled floor points (near-left, near-right, far-right, far-left) clicked on the room photo.}}
+{{shot:floor-corners|The four labelled floor points clicked on the room photo (an earlier marker style; markers are now small crosshair dots joined by a dashed floor outline).}}
 <pre><code>{{log:room_scene}}</code></pre>
 <p><strong>Step 3: paste the Marketplace URL.</strong> The parser extracts the title, gallery and seller dimensions (24" W, 24.5" H, seat 18"). The agent is called once and returns only a category, pose and warnings.</p>
-{{shot:add-listing|Item added: seller-stated dimensions, the agent's category, and the cutout method are shown in the note.}}
 <pre><code>{{log:agent}}</code></pre>
 <p><strong>Step 4: cutout.</strong> Each gallery photo is cut out. The main photo is the "front" view, and the others can be tagged as left, right or back.</p>
-{{shot:item-card|Item card: switch between the cutout and the untouched seller photo, and tag which side each listing photo shows.}}
+{{shot:item-card|Items in the room and the Orientation panel: pose, rotation slider, and the item card with the cutout method and a switch back to the untouched seller photo.}}
 <p><strong>Step 4b: heart the item.</strong> The seller-message agent drafts a short, natural first message. The user can edit it, try another wording, copy it, and open the listing to send it in Messenger.</p>
-{{shot:heart-message|Hearting the bench: a ready-to-send, editable message to the seller with Copy and Open listing buttons.}}
 <p><strong>Step 5: try it in 2D.</strong> The default 2D mode keeps the original photo and lets the user drag and rotate the cutout over it, which is fast for a first look.</p>
-{{shot:view-2d|2D photo mode: the cutout dragged over the room photo.}}
+{{shot:view-2d|2D photo mode: the bench cutout standing on the floor of the room photo.}}
 <p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The view opens at the photo's own viewpoint, so it first looks exactly like the photo, with the bench standing on open floor about 2.4 m away and facing you. You then walk through the room: drag to look around, scroll or W/S to walk, A/D to step sideways. Movement is kept within about 2 m of where the photo was taken, because a single photo can only be reprojected convincingly near its own viewpoint. Earlier versions had separate Photo, Orbit and Top views; testing showed one walk-through mode was easier to understand. The user can drag it, rotate it with Q/E and orbit around it.</p>
-{{shot:orbit-view|Walking through the room: the same item seen after stepping to one side; Theia shows the listing photo nearest this viewing angle.}}
+{{shot:photo-view|The 3D room rebuilt from one photo (an earlier test build): the photo is projected onto a floor and wall model. Moving away from the photo's own viewpoint reveals unphotographed surfaces in plain beige, which is why walking is limited to about 2 m.}}
 
 
 <h3>4.2 How one photo becomes a 3D room</h3>
@@ -146,29 +143,27 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <!-- 5 · TOKENOMICS -->
 <section class="pb">
 <p class="kicker">5 · Tokenomics</p>
-<h2>About three hundredths of a cent per listing</h2>
+<h2>About four hundredths of a cent per listing</h2>
 <h3>Measured usage</h3>
 <p>All numbers come from <code>logs/agent_calls.jsonl</code>: 19 logged agent events on 26 Oct 2026, of which 13 were successful model calls, 5 were network errors (handled by the fallback) and 1 was an offline fallback.</p>
 <table>
 <tr><th>Metric (13 successful calls)</th><th>Input tokens</th><th>Cached input</th><th>Output tokens</th></tr>
-<tr><td>Median call</td><td>156</td><td>0</td><td>22</td></tr>
-<tr><td>Mean call</td><td>330</td><td>0</td><td>37</td></tr>
-<tr><td>Largest call (full Marketplace description)</td><td>625</td><td>0</td><td>22–104</td></tr>
-<tr><td>Total across all 13 calls</td><td>4,294</td><td>0</td><td>486</td></tr>
+<tr><td>Listing agent, gpt-6-luna (13 calls; now also returns verified measurements)</td><td>median 629</td><td>0</td><td>median 100</td></tr>
+<tr><td>Seller-message agent, gpt-6-luna (3 calls, one per ♥)</td><td>median 198</td><td>0</td><td>median 105</td></tr>
+<tr><td>All logged events today</td><td colspan="3">35 events: 29 successful calls, 5 network errors handled by the fallback, 1 offline fallback (early runs used gpt-6-astra / gpt-6-sol; all agents are now fixed to gpt-6-luna)</td></tr>
 </table>
 <p class="small">The cached-input field is now logged for every call. Our prompt is too short (&lt;1,024 tokens) for provider prompt caching to apply, so it is 0.</p>
-{{shot:terminal-log|Agent call log after adding a listing (input, cached input and output tokens per call; no key or image data is logged).}}
 <h3>Cost per run, per user, at scale</h3>
 <p>One "run" is adding one listing: one agent call. Everything else (room upload, cutouts, 3D reconstruction, dragging, walking) uses zero tokens.</p>
 <div class="callout warn"><strong>Price assumption, clearly labelled:</strong> the course pages we could access don't publish a gpt-6-luna price, so we assume small-model list pricing of <strong>$0.40 per 1M input tokens</strong>, $0.10 per 1M cached input, and <strong>$1.60 per 1M output tokens</strong>. Cost scales linearly, so for a different price card multiply each figure below by (real price ÷ assumed price).</div>
 <table>
 <tr><th>Scenario</th><th>Assumption</th><th>Model cost</th></tr>
-<tr><td>One typical run (full description)</td><td>625 in + 22 out tokens</td><td>$0.000285</td></tr>
-<tr><td>One average run (measured mean)</td><td>330 in + 37 out</td><td>$0.000191</td></tr>
-<tr><td>One user, one month</td><td>40 listings considered (an active apartment hunt)</td><td>$0.011</td></tr>
-<tr><td>100 users / month</td><td>40 listings each</td><td>$1.14</td></tr>
-<tr><td>10,000 users / month</td><td>40 listings each</td><td>$114</td></tr>
-<tr><td>Worst case per server, hourly cap reached</td><td>60 calls/hour × 24 h × 30 days</td><td>$12.31 per month, maximum</td></tr>
+<tr><td>Add one listing</td><td>629 in + 100 out tokens</td><td>$0.00041</td></tr>
+<tr><td>Heart one item (seller message)</td><td>198 in + 105 out</td><td>$0.00025</td></tr>
+<tr><td>One user, one month</td><td>40 listings + 10 hearts (an active apartment hunt)</td><td>$0.019</td></tr>
+<tr><td>100 users / month</td><td>same usage each</td><td>$1.90</td></tr>
+<tr><td>10,000 users / month</td><td>same usage each</td><td>$190</td></tr>
+<tr><td>Worst case per server, hourly cap reached</td><td>60 calls/hour × 24 h × 30 days</td><td>about $18 per month, maximum</td></tr>
 </table>
 <p>At scale, model tokens are not the main cost. Hosting and storage are: a small always-on web instance plus CPU time for cutouts and depth inference, which run locally rather than through a paid vision API.</p>
 <h3>What we did to keep cost down</h3>
@@ -200,7 +195,6 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <h3>Defences actually working</h3>
 <p>The tests replace the model with a fake that returns hostile output, so the defences are exercised without spending tokens. Output of <code>python tests/test_agent_safety.py</code>:</p>
 <pre><code>{{test:agent_safety}}</code></pre>
-{{shot:back-silhouette|Walking around an item with no back photo: Theia shows a grey silhouette and says so, instead of inventing the back.}}
 </section>
 
 <!-- 7 · IMPACT -->
@@ -238,15 +232,25 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <li><strong>Items are photo cards, not meshes.</strong> They look right from the angles the seller photographed, and show a silhouette elsewhere. That's honest, but not full 3D.</li>
 <li><strong>Cutouts can still fail</strong> when the item is the same colour as the wall behind it (for example a white table against a white wall). The original-photo toggle is the escape hatch.</li>
 <li><strong>Stitched panoramas</strong> are not a single pinhole camera, so 3D from a panorama is approximate. One photo works best.</li>
-<li><strong>Marketplace pages</strong> can be login-gated; then the user supplies a screenshot or image URL.</li>
+<li><strong>Facebook hides the full description from logged-out requests.</strong> Theia never logs in, so it often receives only a shortened preview. For the side-table listing used in testing, the seller's "20.5″W × 15″D × 28″H" was cut off; Theia correctly labelled its size "estimated" (32 × 55 cm from the photo) rather than "seller-stated", and the user corrected it with <em>Set size</em> (71 cm). A browser extension that reads the listing from the user's own logged-in page is the fix.</li>
+<li><strong>Room scale from one photo is approximate.</strong> Without clicked floor corners and one confirmed room width or length, the camera height is assumed (1.45 m) and sizes can be off by tens of percent. Each item's card shows the size being used, and the user can set the real height.</li>
 <li><strong>three.js loads from a CDN</strong>, so the 3D view needs internet; offline, the 2D preview is used.</li>
 </ul>
+<h3>What live testing found (and fixed)</h3>
+<p>Testing with real listings in a real room exposed several bugs. Each one was traced from logs, not guessed, and fixed:</p>
+<ul>
+<li><strong>"Listed 1w ago" read as "1 inch wide".</strong> The size parser treated Facebook's timestamp as a measurement, so the tables were drawn about 2 cm wide. Timestamps, page code (<code>width:100px</code>) and impossible sizes for the item type are now ignored.</li>
+<li><strong>Large items pinned to the bottom edge.</strong> Keeping the top of an item on screen pushed its base to the bottom of the photo, so it was sized as if it stood right in front of the camera. The item's base on the floor is now its position.</li>
+<li><strong>Adding a listing removed earlier items.</strong> Re-drawing the item cards made each "Remove" button register as a click. Only real clicks now count, which made a 15-item room with a session history possible.</li>
+<li><strong>"Rug" detection matched "material".</strong> A birdcage was laid flat like a rug. Only whole words now count.</li>
+</ul>
+<div class="grid">{{shot:bug-too-big|Before the fix: tables drawn far too large because their base was pinned to the bottom of the photo.}}{{shot:bug-too-small|Before the fix: tables drawn 1 inch wide after "Listed 1w ago" was misread as a size.}}</div>
 <h3>With another month</h3>
 <ol>
 <li>Phone depth capture (Apple RoomPlan or LiDAR) for a measured room. The iOS scaffolding is already in the repo.</li>
 <li>A cutout touch-up brush with undo, and automatic angle tagging of gallery photos.</li>
 <li>Real occlusion and lighting matching, so placed items take on the room's light.</li>
-<li>A browser extension "Send to Theia" button on Marketplace pages.</li>
+<li>A browser extension "Send to Theia" button on Marketplace pages, which would also read the full, logged-in listing text and its measurements.</li>
 <li>A five-person study measuring time-to-decision, wrong-pick-up rate and trust ratings against the photo-editor baseline.</li>
 </ol>
 <div class="callout"><strong>Boundary:</strong> Theia helps decide whether an item is worth the trip. It doesn't replace a tape measure or confirming with the seller.</div>
