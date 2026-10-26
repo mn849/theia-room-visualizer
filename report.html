@@ -109,7 +109,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <tr><td>Depth tool (<code>depth_model.py</code>, optional)</td><td>Turns the room photo into a 3D relief so existing furniture stands up and hides items behind it.</td><td>Depth Anything V2 Small (ONNX, CPU), aligned to the floor plane.</td></tr>
 </table>
 <h3>Model choice</h3>
-<p><strong>gpt-6-luna via Portkey (Responses API).</strong> The job is short classification of untrusted text, so a small, cheap, fast model is enough. It's also the only model allowed on the course key. Early development runs in our log used gpt-6-astra and gpt-6-sol; we switched to gpt-6-luna and made the model an environment setting (<code>THEIA_MODEL</code>). Vision and geometry deliberately don't use an LLM. They run locally, cost no tokens and can't invent details.</p>
+<p><strong>gpt-6-luna via Portkey (Responses API).</strong> The job is short classification of untrusted text, so a small, cheap, fast model is enough. It's also the only model allowed on the course key. Early development runs in our log used gpt-6-astra and gpt-6-sol; both agents (listing classifier and seller-message drafter) are now fixed to gpt-6-luna in code. Vision and geometry deliberately don't use an LLM. They run locally, cost no tokens and can't invent details.</p>
 
 <h3>4.1 One real run, step by step</h3>
 <p>The run below uses a real listing, a vintage spindle-arm bench with floral tapestry, added to a real room photo. Log lines are copied from <code>logs/agent_calls.jsonl</code> and <code>logs/pipeline_events.jsonl</code>.</p>
@@ -118,10 +118,10 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T20:26:58.958851+00:00&quot;, &quot;stage&quot;: &quot;room_upload&quot;, &quot;angles&quot;: 1, &quot;stitched&quot;: false, &quot;exif_focal_35mm&quot;: null}</code></pre>
 <p><strong>Step 2: optionally click four floor corners.</strong> These define the floor rectangle, from which Theia recovers the camera's height, tilt, roll and (without EXIF) focal length.</p>
 <figure><div class="shot-missing">Screenshot <strong>floor-corners</strong> goes here: The four labelled floor points (near-left, near-right, far-right, far-left) clicked on the room photo.<br><small>Save it as docs/screenshots/floor-corners.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T20:46:42.435655+00:00&quot;, &quot;stage&quot;: &quot;room_scene&quot;, &quot;layout_source&quot;: &quot;clicked floor corners + roll from 9 vertical edges&quot;, &quot;focal_source&quot;: &quot;floor-corner vanishing points&quot;, &quot;camera_height_m&quot;: 1.45, &quot;pitch_deg&quot;: -4.41, &quot;roll_deg&quot;: 0.01, &quot;confidence&quot;: &quot;good&quot;, &quot;depth&quot;: false}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T21:14:14.399051+00:00&quot;, &quot;stage&quot;: &quot;room_scene&quot;, &quot;layout_source&quot;: &quot;clicked floor corners + roll from 9 vertical edges&quot;, &quot;focal_source&quot;: &quot;floor-corner vanishing points&quot;, &quot;camera_height_m&quot;: 1.45, &quot;pitch_deg&quot;: -3.92, &quot;roll_deg&quot;: 0.01, &quot;confidence&quot;: &quot;good&quot;, &quot;depth&quot;: false}</code></pre>
 <p><strong>Step 3: paste the Marketplace URL.</strong> The parser extracts the title, gallery and seller dimensions (24" W, 24.5" H, seat 18"). The agent is called once and returns only a category, pose and warnings.</p>
 <figure><div class="shot-missing">Screenshot <strong>add-listing</strong> goes here: Item added: seller-stated dimensions, the agent&#x27;s category, and the cutout method are shown in the note.<br><small>Save it as docs/screenshots/add-listing.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T20:47:00.923138+00:00&quot;, &quot;status&quot;: &quot;success&quot;, &quot;model&quot;: &quot;gpt-6-luna&quot;, &quot;input_tokens&quot;: 603, &quot;cached_input_tokens&quot;: 0, &quot;output_tokens&quot;: 149, &quot;result&quot;: {&quot;category&quot;: &quot;table&quot;, &quot;pose&quot;: &quot;upright&quot;, &quot;flags&quot;: [&quot;Description contains corrupted webpage text.&quot;], &quot;source&quot;: &quot;gpt-6-luna&quot;}}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T21:04:42.774622+00:00&quot;, &quot;agent&quot;: &quot;seller_message&quot;, &quot;status&quot;: &quot;success&quot;, &quot;model&quot;: &quot;gpt-6-luna&quot;, &quot;input_tokens&quot;: 199, &quot;cached_input_tokens&quot;: 0, &quot;output_tokens&quot;: 40, &quot;chars&quot;: 142}</code></pre>
 <p><strong>Step 4: cutout.</strong> Each gallery photo is cut out. The main photo is the "front" view, and the others can be tagged as left, right or back.</p>
 <figure><div class="shot-missing">Screenshot <strong>item-card</strong> goes here: Item card: switch between the cutout and the untouched seller photo, and tag which side each listing photo shows.<br><small>Save it as docs/screenshots/item-card.png and run python docs/build_docs.py</small></div></figure>
 <p><strong>Step 4b: heart the item.</strong> The seller-message agent drafts a short, natural first message. The user can edit it, try another wording, copy it, and open the listing to send it in Messenger.</p>
@@ -313,7 +313,16 @@ overspending tests passed
 seller message tests passed
 </code></pre>
 <h3>Engineering log (git history)</h3>
-<pre><code>2026-10-26 16:39  Fix: &#x27;mat&#x27; substring laid furniture flat; keep 2D items inside preview; robust scene items + server log capture; more diagnostics
+<pre><code>2026-10-26 17:17  All agents fixed to gpt-6-luna (no model override); remove remaining Sol references
+2026-10-26 17:16  Measurements: read seller sizes hidden in Marketplace JSON, ignore CSS noise (width:100px), optional pasted listing text
+2026-10-26 17:13  2D: remove 95px minimum width that inflated far items; show each item&#x27;s size and let the user set its real height
+2026-10-26 17:11  Scale from a user-entered room length (back wall = length - 0.3 m from camera); remember all confirmed measurements
+2026-10-26 17:08  2D scaling: position = item&#x27;s feet on the floor (no more pinning big items to the bottom edge); log which callback fails
+2026-10-26 17:03  Click an item to select it for orientation controls (2D highlight + 3D already); docs of stale-page diagnosis
+2026-10-26 16:58  Measurements: robust listing-text parser, single stated size completed from photo proportions with camera-angle correction, per-piece sizes; 2D items sized in true metres from the recovered camera; reject telephoto lens estimates
+2026-10-26 16:51  3D: pass items to the viewer straight from the browser store (a late server reply was overwriting the scene with zero items)
+2026-10-26 16:48  Fix items disappearing (Remove fired on re-render); reliable heart panel for the selected item; session history with Add back; split multi-piece listings into separate movable items; clear inputs after adding; better size priors
+2026-10-26 16:39  Fix: &#x27;mat&#x27; substring laid furniture flat; keep 2D items inside preview; robust scene items + server log capture; more diagnostics
 2026-10-26 16:35  Browser diagnostics: JS errors + image-free layout snapshots logged to logs/client_diagnostics.jsonl
 2026-10-26 16:31  3D: new items start centred and inside the photo&#x27;s field of view; reset stale saved placements
 2026-10-26 16:24  Up to 15 items per room, saved on the device (local storage); 2D positions persist across adds; 15-item limit prompt; 7-day media retention
@@ -328,15 +337,7 @@ seller message tests passed
 2026-10-26 12:39  Agent overspending guards: per-listing result cache and hourly call cap, with tests
 2026-10-26 12:38  Clear wall-coloured gaps between legs (row-wise background match); one-click launcher; agent safety tests; evidence figures
 2026-10-26 12:28  Docs: model name
-2026-10-26 12:28  Docs: 3D view usage, optional models, tests, project map
-2026-10-26 12:27  3D room viewer: photo-view camera, orbit/top views, floor/wall dragging with wall snapping, view-dependent listing photos
-2026-10-26 12:22  Room geometry: camera from EXIF/floor corners/vertical edges, room box, optional depth alignment + tests
-2026-10-26 12:19  Faithful item cutouts: full-res media cache, soft alpha, colour-aware hole repair, keep hero photo
-2026-10-26 12:17  Use course-approved gpt-6-luna model by default; log cached input tokens
-2026-10-26 12:11  Checkpoint: Theia 2D placement prototype before cutout/3D work
-2026-10-13 11:11  Adopt native-first room capture architecture
-2026-10-13 10:58  Allow local phone testing over Wi-Fi
-2026-10-13 10:57  Initialize LumaRoom room scanner prototype</code></pre>
+2026-10-26 12:28  Docs: 3D view usage, optional models, tests, project map</code></pre>
 <p class="small">Prepared 26 October 2026. Claims distinguish measured results (tests, logs) from labelled estimates.</p>
 </section>
 </main></body></html>

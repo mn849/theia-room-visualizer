@@ -109,7 +109,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <tr><td>Depth tool (<code>depth_model.py</code>, optional)</td><td>Turns the room photo into a 3D relief so existing furniture stands up and hides items behind it.</td><td>Depth Anything V2 Small (ONNX, CPU), aligned to the floor plane.</td></tr>
 </table>
 <h3>Model choice</h3>
-<p><strong>gpt-6-luna via Portkey (Responses API).</strong> The job is short classification of untrusted text, so a small, cheap, fast model is enough. It's also the only model allowed on the course key. Early development runs in our log used gpt-6-astra and gpt-6-sol; we switched to gpt-6-luna and made the model an environment setting (<code>THEIA_MODEL</code>). Vision and geometry deliberately don't use an LLM. They run locally, cost no tokens and can't invent details.</p>
+<p><strong>gpt-6-luna via Portkey (Responses API).</strong> The job is short classification of untrusted text, so a small, cheap, fast model is enough. It's also the only model allowed on the course key. Early development runs in our log used gpt-6-astra and gpt-6-sol; both agents (listing classifier and seller-message drafter) are now fixed to gpt-6-luna in code. Vision and geometry deliberately don't use an LLM. They run locally, cost no tokens and can't invent details.</p>
 
 <h3>4.1 One real run, step by step</h3>
 <p>The run below uses a real listing, a vintage spindle-arm bench with floral tapestry, added to a real room photo. Log lines are copied from <code>logs/agent_calls.jsonl</code> and <code>logs/pipeline_events.jsonl</code>.</p>
