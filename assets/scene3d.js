@@ -28,9 +28,9 @@
 
   function loadThree() {
     if (loading) return loading;
-    loading = Promise.all([import('three'), import('three/addons/controls/OrbitControls.js')])
+    loading = Promise.all([import('three')])
       .then(function (mods) {
-        THREE = mods[0]; OrbitControls = mods[1].OrbitControls;
+        THREE = mods[0];
         THREE.ColorManagement.enabled = false; // pass photo pixels through untouched
       })
       .catch(function (err) { loadFailed = true; console.warn('Theia 3D viewer unavailable', err); });
@@ -67,23 +67,20 @@
     frame.appendChild(renderer.domElement);
     const toolbar = el('div', 'scene3d-toolbar');
     const buttons = {};
-    [['photo', 'Photo view'], ['orbit', 'Orbit'], ['top', 'Top view']].forEach(function (pair) {
-      const b = el('button', 'scene3d-btn', pair[1]);
-      b.type = 'button'; b.dataset.view = pair[0];
-      toolbar.appendChild(b); buttons[pair[0]] = b;
-    });
+    const resetBtn = el('button', 'scene3d-btn', 'Reset view');
+    resetBtn.type = 'button'; toolbar.appendChild(resetBtn); buttons.reset = resetBtn;
     const badge = el('div', 'scene3d-badge');
     const notice = el('div', 'scene3d-notice');
-    const help = el('div', 'scene3d-help', 'Drag an item to move it · drag empty space to orbit · right-drag to pan · scroll to zoom · Q / E rotate the selected item · hold Alt to stop wall snapping');
+    const help = el('div', 'scene3d-help', 'Walk through: drag to look around · scroll or W / S to walk · A / D to step sideways · drag an item to move it · Q / E rotate it · hold Alt to stop wall snapping');
     frame.appendChild(toolbar); frame.appendChild(badge); frame.appendChild(notice);
     container.appendChild(frame); container.appendChild(help);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(60, 4 / 3, 0.05, 80);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.dampingFactor = 0.12;
-    controls.maxPolarAngle = Math.PI / 2 - 0.04; controls.minDistance = 0.4; controls.maxDistance = 18;
-    controls.enabled = false;
+    // First-person "walk" state relative to the photo's own camera. Motion is
+    // kept within a small radius and angle of where the photo was taken,
+    // because that is where a single photo can be reprojected convincingly.
+    const controls = { enabled: true, yaw: 0, pitch: 0, offset: null, keys: {} };
 
     state = {
       container: container, frame: frame, renderer: renderer, scene: scene, camera: camera, controls: controls,
@@ -93,23 +90,51 @@
     };
     scene.add(state.roomGroup); scene.add(state.itemGroup);
 
-    buttons.photo.addEventListener('click', function () { goPhotoView(true); });
-    buttons.orbit.addEventListener('click', function () { goOrbitView(); });
-    buttons.top.addEventListener('click', function () { goTopView(); });
-    controls.addEventListener('start', function () {
-      if (state.mode === 'photo' && !state.drag) setMode('orbit');
-    });
+    buttons.reset.addEventListener('click', function () { goPhotoView(true); });
     wirePointer(renderer.domElement);
     window.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', function (e) { if (state.hover && WALK_KEYS[e.key]) { state.controls.keys[e.key] = true; e.preventDefault(); } });
+    window.addEventListener('keyup', function (e) { delete state.controls.keys[e.key]; });
+    renderer.domElement.addEventListener('pointerenter', function () { state.hover = true; });
+    renderer.domElement.addEventListener('pointerleave', function () { state.hover = false; state.controls.keys = {}; });
+    renderer.domElement.addEventListener('wheel', function (e) {
+      if (!state.data) return;
+      e.preventDefault();
+      walk(-e.deltaY * 0.0025, 0);
+    }, { passive: false });
     new ResizeObserver(resize).observe(container);
     renderer.setAnimationLoop(tick);
     return state;
   }
 
-  function setMode(mode) {
-    state.mode = mode;
-    Object.keys(state.buttons).forEach(function (k) { state.buttons[k].classList.toggle('active', k === mode); });
-    if (mode !== 'photo') { state.camera.up.set(0, 1, 0); state.controls.enabled = true; }
+  const WALK_KEYS = { w: [1, 0], W: [1, 0], ArrowUp: [1, 0], s: [-1, 0], S: [-1, 0], ArrowDown: [-1, 0], a: [0, -1], A: [0, -1], ArrowLeft: [0, -1], d: [0, 1], D: [0, 1], ArrowRight: [0, 1] };
+  const MAX_WALK_M = 2.2, MAX_YAW = THREE_DEG(55), MAX_PITCH = THREE_DEG(25);
+  function THREE_DEG(d) { return d * Math.PI / 180; }
+
+  function setMode(mode) { state.mode = mode; }
+
+  // Move the eye on the floor plane (forward/back along the view direction,
+  // sideways), staying within MAX_WALK_M of the photo camera and on the floor.
+  function walk(forward, side) {
+    const c = state.controls, pc = state.photoCam;
+    if (!pc) return;
+    const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), c.yaw);
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(pc.quaternion).applyQuaternion(yawQ); fwd.y = 0; fwd.normalize();
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    const next = c.offset.clone().add(fwd.multiplyScalar(forward)).add(right.multiplyScalar(side));
+    if (next.length() > MAX_WALK_M) next.setLength(MAX_WALK_M);
+    const world = pc.position.clone().add(next);
+    if (!pointInFloor(world.x, world.z)) return;
+    c.offset.copy(next);
+  }
+
+  function applyWalk() {
+    const c = state.controls, pc = state.photoCam;
+    Object.keys(c.keys).forEach(function (k) { const v = WALK_KEYS[k]; if (v) walk(v[0] * 0.035, v[1] * 0.03); });
+    const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), c.yaw);
+    const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), c.pitch);
+    state.camera.quaternion.copy(yawQ).multiply(pc.quaternion).multiply(pitchQ);
+    state.camera.position.copy(pc.position).add(c.offset);
   }
 
   function resize() {
@@ -333,27 +358,48 @@
   function wallById(name) { return state.walls.find(function (w) { return w.name === name; }) || state.walls[0]; }
   function yawFromNormal(n) { return Math.atan2(n.x, n.y); }
 
+  // Items always start clearly in view: on open floor in front of the photo
+  // camera (about 2.4 m away, closer if the floor ends sooner), facing you.
+  // If that spot is close to a wall the item is pushed flush against it.
   function defaultPlacement(entry, index) {
     const item = entry.item, dims = entry.dims;
-    const conf = state.data.room.scene.confidence;
-    const back = wallById('back');
-    const t = 0.5 + ((index % 3) - 1) * 0.28;
-    const along = back.a.clone().lerp(back.b, t);
+    const pc = state.photoCam;
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(pc.quaternion); fwd.y = 0; fwd.normalize();
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    const facing = Math.atan2(-fwd.x, -fwd.z);
     if (item.pose === 'wall') {
-      const p = along.clone().add(back.n.clone().multiplyScalar(0.012));
-      return { x: p.x, z: p.y, yaw: yawFromNormal(back.n), y: Math.max(0.3, 1.45 - dims.h / 2), wall: 'back' };
+      state.raycaster.set(pc.position.clone(), fwd.clone());
+      const hit = state.raycaster.intersectObjects(state.walls.map(function (w) { return w.mesh; }), false)[0];
+      if (hit && hit.distance < 10) {
+        const w = hit.object.userData.wall;
+        const side = right.clone().multiplyScalar(((index % 3) - 1) * 0.8);
+        return { x: hit.point.x + side.x + w.n.x * 0.012, z: hit.point.z + side.z + w.n.y * 0.012, yaw: yawFromNormal(w.n), y: Math.max(0.3, 1.45 - dims.h / 2), wall: w.name };
+      }
     }
-    if (item.pose === 'flat' || conf === 'rough') {
-      // Without a clicked floor, place in open floor in front of the camera.
-      const pc = state.photoCam;
-      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(pc.quaternion); fwd.y = 0; fwd.normalize();
-      const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
-      const dist = item.pose === 'flat' ? 2.0 : 2.6;
-      const p = new THREE.Vector3(pc.position.x, 0, pc.position.z).add(fwd.multiplyScalar(dist)).add(right.multiplyScalar(((index % 3) - 1) * 0.9));
-      return { x: p.x, z: p.z, yaw: Math.atan2(-fwd.x, -fwd.z) + (item.pose === 'flat' ? 0 : 0), y: 0 };
+    const base = new THREE.Vector3(pc.position.x, 0, pc.position.z);
+    const sideways = ((index % 3) - 1) * 0.9;
+    let p = null;
+    for (let dist = item.pose === 'flat' ? 2.0 : 2.4; dist >= 1.0; dist -= 0.2) {
+      const q = base.clone().add(fwd.clone().multiplyScalar(dist)).add(right.clone().multiplyScalar(sideways));
+      const candidate = { x: q.x, z: q.z, yaw: facing, y: item.pose === 'wall' ? 1.0 : 0 };
+      if (footprintInside(entry, candidate)) { p = candidate; break; }
     }
-    const p = along.clone().add(back.n.clone().multiplyScalar(dims.d / 2 + 0.03));
-    return { x: p.x, z: p.y, yaw: yawFromNormal(back.n), y: 0, wall: 'back' };
+    if (!p) {
+      const q = base.clone().add(fwd.clone().multiplyScalar(1.6));
+      p = { x: q.x, z: q.z, yaw: facing, y: 0 };
+    }
+    if (item.pose === 'upright') snapToWalls(entry, p);
+    return p;
+  }
+
+  // A saved placement is only reused if it is still in front of the camera
+  // and on the floor (older sessions could leave items far away).
+  function placementUsable(entry, p) {
+    if (!p) return false;
+    const pc = state.photoCam;
+    const dx = p.x - pc.position.x, dz = p.z - pc.position.z;
+    if (Math.hypot(dx, dz) > 7) return false;
+    return entry.item.pose === 'wall' || pointInFloor(p.x, p.z);
   }
 
   function applyPlacement(entry) {
@@ -373,7 +419,7 @@
       state.items.set(item.id, entry);
       state.itemGroup.add(entry.group);
       const existing = state.placements[item.id];
-      if (!existing || existing.pose !== item.pose) {
+      if (!existing || existing.pose !== item.pose || !placementUsable(entry, existing)) {
         state.placements[item.id] = Object.assign(defaultPlacement(entry, index), { pose: item.pose });
       }
       applyPlacement(entry);
@@ -457,10 +503,9 @@
         const done = state.tween.done; state.tween = null;
         if (done) done();
       }
-    } else if (state.controls.enabled && state.mode !== 'photo') {
-      state.controls.update();
+    } else if (state.photoCam) {
+      applyWalk();
     }
-    state.ceilingMesh.visible = state.mode !== 'top';
     updateViewDependentCards();
     state.renderer.render(state.scene, state.camera);
   }
@@ -475,46 +520,10 @@
   }
 
   function goPhotoView(animate) {
-    setMode('photo');
-    state.controls.enabled = false;
     const pc = state.photoCam;
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(pc.quaternion);
-    const target = pc.position.clone().add(fwd.multiplyScalar(3));
-    const finish = function () {
-      state.camera.position.copy(pc.position); state.camera.quaternion.copy(pc.quaternion);
-      state.camera.up.set(0, 1, 0);
-      state.controls.target.copy(target);
-      state.controls.enabled = true; // first drag/scroll switches to orbit mode
-    };
-    if (animate) animateTo(pc.position.clone(), pc.quaternion.clone(), finish); else finish();
-  }
-
-  function goOrbitView() {
-    setMode('orbit');
-    // Swing ~30 degrees around the selected item (or the floor centre) and
-    // rise a little, so the photo texture stays mostly valid.
-    const centre = selectedPosition() || floorCentre();
-    const pc = state.photoCam;
-    const target = centre.clone().setY(0.45);
-    const offset = pc.position.clone().sub(target);
-    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(30));
-    const pos = target.clone().add(offset).add(new THREE.Vector3(0, 0.35, 0));
-    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, target, new THREE.Vector3(0, 1, 0)));
-    state.controls.enabled = false;
-    animateTo(pos, q, function () { state.controls.target.copy(target); state.controls.enabled = true; });
-  }
-
-  function goTopView() {
-    setMode('top');
-    const centre = floorCentre();
-    const span = state.floor.reduce(function (m, p) { return Math.max(m, p.distanceTo(new THREE.Vector2(centre.x, centre.z))); }, 1);
-    const height = Math.max(4, span * 2.2);
-    const pc = state.photoCam;
-    const back = new THREE.Vector3(pc.position.x - centre.x, 0, pc.position.z - centre.z).normalize();
-    const pos = centre.clone().add(back.multiplyScalar(height * 0.18)).setY(height);
-    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, centre, new THREE.Vector3(0, 1, 0)));
-    state.controls.enabled = false;
-    animateTo(pos, q, function () { state.controls.target.copy(centre); state.controls.enabled = true; });
+    const c = state.controls;
+    const finish = function () { c.yaw = 0; c.pitch = 0; c.offset = new THREE.Vector3(); };
+    if (animate) animateTo(pc.position.clone(), pc.quaternion.clone(), finish); else { finish(); applyWalk(); }
   }
 
   function selectedPosition() {
@@ -565,10 +574,22 @@
       const entry = state.items.get(id), p = state.placements[id];
       const start = entry.item.pose === 'wall' ? null : floorHit(event, 0);
       state.drag = { id: id, offset: start ? new THREE.Vector2(p.x - start.x, p.z - start.z) : new THREE.Vector2(), pointerId: event.pointerId };
-      state.controls.enabled = false;
       canvas.setPointerCapture(event.pointerId);
     }, true);
+    // Dragging empty space looks around (like turning your head).
+    canvas.addEventListener('pointerdown', function (event) {
+      if (!state.data || state.drag || state.tween) return;
+      state.look = { x: event.clientX, y: event.clientY, yaw: state.controls.yaw, pitch: state.controls.pitch };
+      canvas.setPointerCapture(event.pointerId);
+      canvas.style.cursor = 'move';
+    });
     canvas.addEventListener('pointermove', function (event) {
+      if (state.look && !state.drag) {
+        const c = state.controls;
+        c.yaw = THREE.MathUtils.clamp(state.look.yaw + (event.clientX - state.look.x) * 0.0045, -MAX_YAW, MAX_YAW);
+        c.pitch = THREE.MathUtils.clamp(state.look.pitch + (event.clientY - state.look.y) * 0.0035, -MAX_PITCH, MAX_PITCH);
+        return;
+      }
       if (!state.drag) { canvas.style.cursor = pickItem(event) ? 'grab' : ''; return; }
       const entry = state.items.get(state.drag.id), p = Object.assign({}, state.placements[state.drag.id]);
       if (entry.item.pose === 'wall') {
@@ -590,10 +611,13 @@
       canvas.style.cursor = 'grabbing';
     });
     const end = function (event) {
+      if (state.look) {
+        state.look = null; canvas.style.cursor = '';
+        if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      }
       if (!state.drag) return;
       if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
       state.drag = null;
-      if (state.mode !== 'photo') state.controls.enabled = true;
       canvas.style.cursor = '';
       sendPlacements();
     };

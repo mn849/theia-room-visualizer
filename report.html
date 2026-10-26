@@ -29,7 +29,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <figure><div class="shot-missing">Screenshot <strong>photo-view</strong> goes here: Theia&#x27;s 3D preview opening at the exact viewpoint of the room photo, with a Marketplace item placed at its seller-stated size.<br><small>Save it as docs/screenshots/photo-view.png and run python docs/build_docs.py</small></div></figure>
 <div class="grid3">
 <div class="card"><div class="metric">1 agent call</div>per new listing (cached on repeats, capped per hour)</div>
-<div class="card"><div class="metric">0 tokens</div>for cutouts, 3D reconstruction, dragging and orbiting (all local)</div>
+<div class="card"><div class="metric">0 tokens</div>for cutouts, 3D reconstruction, dragging and walking (all local)</div>
 <div class="card"><div class="metric">0 invented pixels</div>items are always the seller's photo; unseen sides show as a grey silhouette</div>
 </div>
 <p class="small">Contents: 1 Title · 2 Motivation · 3 What is new · 4 The agents · 5 Tokenomics · 6 Safety · 7 Impact · 8 Limits and next steps · Appendix (reproduction, tests).</p>
@@ -117,17 +117,17 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T16:37:57.952382+00:00&quot;, &quot;stage&quot;: &quot;room_upload&quot;, &quot;angles&quot;: 1, &quot;stitched&quot;: false, &quot;exif_focal_35mm&quot;: null}</code></pre>
 <p><strong>Step 2: optionally click four floor corners.</strong> These define the floor rectangle, from which Theia recovers the camera's height, tilt, roll and (without EXIF) focal length.</p>
 <figure><div class="shot-missing">Screenshot <strong>floor-corners</strong> goes here: The four labelled floor points (near-left, near-right, far-right, far-left) clicked on the room photo.<br><small>Save it as docs/screenshots/floor-corners.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T17:16:37.251565+00:00&quot;, &quot;stage&quot;: &quot;room_scene&quot;, &quot;layout_source&quot;: &quot;clicked floor corners&quot;, &quot;focal_source&quot;: &quot;floor-corner vanishing points&quot;, &quot;camera_height_m&quot;: 1.45, &quot;pitch_deg&quot;: -5.05, &quot;roll_deg&quot;: 6.43, &quot;confidence&quot;: &quot;good&quot;, &quot;depth&quot;: false}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T17:28:17.795959+00:00&quot;, &quot;stage&quot;: &quot;room_scene&quot;, &quot;layout_source&quot;: &quot;clicked floor corners + tilt from 9 vertical edges&quot;, &quot;focal_source&quot;: &quot;floor-corner vanishing points&quot;, &quot;camera_height_m&quot;: 1.45, &quot;pitch_deg&quot;: 0.43, &quot;roll_deg&quot;: 0.01, &quot;confidence&quot;: &quot;good&quot;, &quot;depth&quot;: false}</code></pre>
 <p><strong>Step 3: paste the Marketplace URL.</strong> The parser extracts the title, gallery and seller dimensions (24" W, 24.5" H, seat 18"). The agent is called once and returns only a category, pose and warnings.</p>
 <figure><div class="shot-missing">Screenshot <strong>add-listing</strong> goes here: Item added: seller-stated dimensions, the agent&#x27;s category, and the cutout method are shown in the note.<br><small>Save it as docs/screenshots/add-listing.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T17:17:24.568646+00:00&quot;, &quot;status&quot;: &quot;success&quot;, &quot;model&quot;: &quot;gpt-6-luna&quot;, &quot;input_tokens&quot;: 625, &quot;cached_input_tokens&quot;: 0, &quot;output_tokens&quot;: 72, &quot;result&quot;: {&quot;category&quot;: &quot;bench&quot;, &quot;pose&quot;: &quot;upright&quot;, &quot;flags&quot;: [&quot;Description contains unrelated webpage markup.&quot;], &quot;source&quot;: &quot;gpt-6-luna&quot;}}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T17:28:39.026011+00:00&quot;, &quot;status&quot;: &quot;success&quot;, &quot;model&quot;: &quot;gpt-6-luna&quot;, &quot;input_tokens&quot;: 625, &quot;cached_input_tokens&quot;: 0, &quot;output_tokens&quot;: 72, &quot;result&quot;: {&quot;category&quot;: &quot;bench&quot;, &quot;pose&quot;: &quot;upright&quot;, &quot;flags&quot;: [&quot;Description contains unrelated webpage markup.&quot;], &quot;source&quot;: &quot;gpt-6-luna&quot;}}</code></pre>
 <p><strong>Step 4: cutout.</strong> Each gallery photo is cut out. The main photo is the "front" view, and the others can be tagged as left, right or back.</p>
 <figure><div class="shot-missing">Screenshot <strong>item-card</strong> goes here: Item card: switch between the cutout and the untouched seller photo, and tag which side each listing photo shows.<br><small>Save it as docs/screenshots/item-card.png and run python docs/build_docs.py</small></div></figure>
 <p><strong>Step 5: try it in 2D.</strong> The default 2D mode keeps the original photo and lets the user drag and rotate the cutout over it, which is fast for a first look.</p>
 <figure><div class="shot-missing">Screenshot <strong>view-2d</strong> goes here: 2D photo mode: the cutout dragged over the room photo.<br><small>Save it as docs/screenshots/view-2d.png and run python docs/build_docs.py</small></div></figure>
-<p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The bench is placed flush against the back wall, facing into the room. The user can drag it, rotate it with Q/E and orbit around it.</p>
-<figure><div class="shot-missing">Screenshot <strong>orbit-view</strong> goes here: Orbit view: the same item seen from another angle; Theia shows the listing photo nearest this viewing angle.<br><small>Save it as docs/screenshots/orbit-view.png and run python docs/build_docs.py</small></div></figure>
-<figure><div class="shot-missing">Screenshot <strong>top-view</strong> goes here: Top view: the item footprint against the room&#x27;s walls; a red outline would mean it does not fit.<br><small>Save it as docs/screenshots/top-view.png and run python docs/build_docs.py</small></div></figure>
+<p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The view opens at the photo's own viewpoint, so it first looks exactly like the photo, with the bench standing on open floor about 2.4 m away and facing you. You then walk through the room: drag to look around, scroll or W/S to walk, A/D to step sideways. Movement is kept within about 2 m of where the photo was taken, because a single photo can only be reprojected convincingly near its own viewpoint. Earlier versions had separate Photo, Orbit and Top views; testing showed one walk-through mode was easier to understand. The user can drag it, rotate it with Q/E and orbit around it.</p>
+<figure><div class="shot-missing">Screenshot <strong>orbit-view</strong> goes here: Walking through the room: the same item seen after stepping to one side; Theia shows the listing photo nearest this viewing angle.<br><small>Save it as docs/screenshots/orbit-view.png and run python docs/build_docs.py</small></div></figure>
+
 
 <h3>4.2 How one photo becomes a 3D room</h3>
 <ol>
@@ -156,7 +156,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <p class="small">The cached-input field is now logged for every call. Our prompt is too short (&lt;1,024 tokens) for provider prompt caching to apply, so it is 0.</p>
 <figure><div class="shot-missing">Screenshot <strong>terminal-log</strong> goes here: Agent call log after adding a listing (input, cached input and output tokens per call; no key or image data is logged).<br><small>Save it as docs/screenshots/terminal-log.png and run python docs/build_docs.py</small></div></figure>
 <h3>Cost per run, per user, at scale</h3>
-<p>One "run" is adding one listing: one agent call. Everything else (room upload, cutouts, 3D reconstruction, dragging, orbiting) uses zero tokens.</p>
+<p>One "run" is adding one listing: one agent call. Everything else (room upload, cutouts, 3D reconstruction, dragging, walking) uses zero tokens.</p>
 <div class="callout warn"><strong>Price assumption, clearly labelled:</strong> the course pages we could access don't publish a gpt-6-luna price, so we assume small-model list pricing of <strong>$0.40 per 1M input tokens</strong>, $0.10 per 1M cached input, and <strong>$1.60 per 1M output tokens</strong>. Cost scales linearly, so for a different price card multiply each figure below by (real price ÷ assumed price).</div>
 <table>
 <tr><th>Scenario</th><th>Assumption</th><th>Model cost</th></tr>
@@ -203,7 +203,7 @@ agent safety tests passed
 5a five identical adds -&gt; model calls: 1
 5b runaway loop of 10 new listings with cap 3 -&gt; model calls: 3 ; last flag: [&#x27;hourly model budget reached; deterministic classification used&#x27;]
 overspending tests passed</code></pre>
-<figure><div class="shot-missing">Screenshot <strong>back-silhouette</strong> goes here: Orbiting behind an item with no back photo: Theia shows a grey silhouette and says so, instead of inventing the back.<br><small>Save it as docs/screenshots/back-silhouette.png and run python docs/build_docs.py</small></div></figure>
+<figure><div class="shot-missing">Screenshot <strong>back-silhouette</strong> goes here: Walking around an item with no back photo: Theia shows a grey silhouette and says so, instead of inventing the back.<br><small>Save it as docs/screenshots/back-silhouette.png and run python docs/build_docs.py</small></div></figure>
 </section>
 
 <!-- 7 · IMPACT -->
@@ -237,7 +237,7 @@ overspending tests passed</code></pre>
 <p class="kicker">8 · Limits and next steps</p>
 <h2>Where the prototype stops</h2>
 <ul>
-<li><strong>One photo isn't a 3D scan.</strong> Without the depth model, existing furniture in the photo is painted flat onto the floor and walls when you orbit far from the photo viewpoint. Without floor clicks, the layout is "rough" and the scale assumes a 1.45 m phone height.</li>
+<li><strong>One photo isn't a 3D scan.</strong> Without the depth model, existing furniture in the photo is painted flat onto the floor and walls when you move away from the photo viewpoint, which is why walking is limited to about 2 m. Without floor clicks, the layout is "rough" and the scale assumes a 1.45 m phone height.</li>
 <li><strong>Items are photo cards, not meshes.</strong> They look right from the angles the seller photographed, and show a silhouette elsewhere. That's honest, but not full 3D.</li>
 <li><strong>Cutouts can still fail</strong> when the item is the same colour as the wall behind it (for example a white table against a white wall). The original-photo toggle is the escape hatch.</li>
 <li><strong>Stitched panoramas</strong> are not a single pinhole camera, so 3D from a panorama is approximate. One photo works best.</li>
@@ -301,7 +301,8 @@ agent safety tests passed
 overspending tests passed
 </code></pre>
 <h3>Engineering log (git history)</h3>
-<pre><code>2026-10-26 13:06  Marker tag text: ASCII separator
+<pre><code>2026-10-26 13:23  Cutouts: model-guided GrabCut recovers ghosted upholstery, keeps see-through wall transparent; real-listing before/after figure
+2026-10-26 13:06  Marker tag text: ASCII separator
 2026-10-26 13:05  Floor-corner markers: precise crosshair dots, compact numbered tags, live floor outline
 2026-10-26 12:44  Report and reveal.js slides rebuilt from templates with embedded figures, real logs and test output
 2026-10-26 12:43  2D/3D view toggle (2D default); tilt/roll from vertical edges when floor clicks are imperfect; gentler orbit view; restore 2D rotation

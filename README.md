@@ -22,7 +22,8 @@ Open <http://127.0.0.1:8050> in a browser. Upload a room photo, paste a listing 
 
 The preview is a 3D reconstruction of your room photo that opens at the exact viewpoint the photo was taken from, so it first looks like the photo itself.
 
-- **Photo view / Orbit / Top view** buttons switch viewpoints; drag empty space to orbit, right-drag to pan, scroll to zoom.
+- **2D photo / 3D room** toggle at the top of the preview (2D is the default).
+- **3D walk-through:** opens at the photo's own viewpoint. Drag to look around, scroll or W/S to walk, A/D to step sideways, and **Reset view** returns to the photo. Movement stays within about 2 m of where the photo was taken, the range a single photo can show convincingly.
 - **Drag an item** to move it on the floor. Upright items snap flush against a wall (hold **Alt** to stop snapping); rugs lie flat; art (“Facing the wall”) slides along walls. **Q / E** or the rotation slider turn the selected item. A red footprint means the item does not fit inside the floor.
 - **Better accuracy:** click the four floor corners and confirm one room measurement. Without clicks, Theia estimates the camera tilt from vertical edges in the photo and assumes a 1.45 m phone height. The note under the preview always says which evidence was used.
 - **Items stay faithful:** an item is always the seller's own photo at the seller's dimensions. In each item card you can switch between the cutout and the untouched seller photo, and tag extra listing photos (left side, back, …); while orbiting, Theia shows the real photo nearest your viewing angle. Sides with no listing photo are drawn as a grey silhouette instead of being invented.
@@ -54,7 +55,7 @@ The repository includes `render.yaml` and `Procfile`. Create a new Render Web Se
 - `listing_agent.py` — gpt-6-luna classifier, schema validation, safety fallback, and token log writer
 - `assets/style.css` — visual system and responsive layout
 - `assets/placement.js` — 2D fallback drag behaviour (used only if the 3D viewer cannot load)
-- `assets/scene3d.js` — three.js 3D room viewer (photo view, orbit, item dragging, wall snapping)
+- `assets/scene3d.js` — three.js 3D room viewer (walk-through camera, item dragging, wall snapping)
 - `room_geometry.py` — single-photo camera + floor + room-box reconstruction
 - `depth_model.py` — optional Depth Anything V2 relief for the 3D room
 - `item_cutout.py` — source-faithful cutouts (soft alpha, colour-aware hole repair)
@@ -72,7 +73,7 @@ The repository includes `render.yaml` and `Procfile`. Create a new Render Web Se
 3. Multi-angle room capture (current): upload overlapping room views; Theia corrects each view and attempts a feature-based panorama, while preserving the original angles in session storage.
 4. Session room and item libraries (current): keep room sets and up to 12 placed items in browser session storage so objects can be compared together.
 5. Better item cutouts (current): full-resolution, soft-alpha cutouts with colour-aware hole repair and a one-click switch back to the untouched seller photo.
-6. 3D room (current): single-photo camera/floor reconstruction, orbitable 3D view, wall snapping, view-dependent listing photos.
+6. 3D room (current): single-photo camera/floor reconstruction, walk-through 3D view, wall snapping, view-dependent listing photos.
 7. Scale and fit: use seller dimensions only when present; otherwise label the overlay as unscaled.
 8. Native iPhone RoomPlan capture and optional AR preview.
 9. Evidence and hardening: real-user tests, blocked/private URL tests, screenshots, and fresh-clone dry run.

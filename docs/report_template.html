@@ -29,7 +29,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 {{shot:photo-view|Theia's 3D preview opening at the exact viewpoint of the room photo, with a Marketplace item placed at its seller-stated size.}}
 <div class="grid3">
 <div class="card"><div class="metric">1 agent call</div>per new listing (cached on repeats, capped per hour)</div>
-<div class="card"><div class="metric">0 tokens</div>for cutouts, 3D reconstruction, dragging and orbiting (all local)</div>
+<div class="card"><div class="metric">0 tokens</div>for cutouts, 3D reconstruction, dragging and walking (all local)</div>
 <div class="card"><div class="metric">0 invented pixels</div>items are always the seller's photo; unseen sides show as a grey silhouette</div>
 </div>
 <p class="small">Contents: 1 Title · 2 Motivation · 3 What is new · 4 The agents · 5 Tokenomics · 6 Safety · 7 Impact · 8 Limits and next steps · Appendix (reproduction, tests).</p>
@@ -125,9 +125,9 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 {{shot:item-card|Item card: switch between the cutout and the untouched seller photo, and tag which side each listing photo shows.}}
 <p><strong>Step 5: try it in 2D.</strong> The default 2D mode keeps the original photo and lets the user drag and rotate the cutout over it, which is fast for a first look.</p>
 {{shot:view-2d|2D photo mode: the cutout dragged over the room photo.}}
-<p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The bench is placed flush against the back wall, facing into the room. The user can drag it, rotate it with Q/E and orbit around it.</p>
-{{shot:orbit-view|Orbit view: the same item seen from another angle; Theia shows the listing photo nearest this viewing angle.}}
-{{shot:top-view|Top view: the item footprint against the room's walls; a red outline would mean it does not fit.}}
+<p><strong>Step 6: switch to 3D.</strong> The browser receives the camera, floor polygon, walls and items (in metres). The view opens at the photo's own viewpoint, so it first looks exactly like the photo, with the bench standing on open floor about 2.4 m away and facing you. You then walk through the room: drag to look around, scroll or W/S to walk, A/D to step sideways. Movement is kept within about 2 m of where the photo was taken, because a single photo can only be reprojected convincingly near its own viewpoint. Earlier versions had separate Photo, Orbit and Top views; testing showed one walk-through mode was easier to understand. The user can drag it, rotate it with Q/E and orbit around it.</p>
+{{shot:orbit-view|Walking through the room: the same item seen after stepping to one side; Theia shows the listing photo nearest this viewing angle.}}
+
 
 <h3>4.2 How one photo becomes a 3D room</h3>
 <ol>
@@ -156,7 +156,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <p class="small">The cached-input field is now logged for every call. Our prompt is too short (&lt;1,024 tokens) for provider prompt caching to apply, so it is 0.</p>
 {{shot:terminal-log|Agent call log after adding a listing (input, cached input and output tokens per call; no key or image data is logged).}}
 <h3>Cost per run, per user, at scale</h3>
-<p>One "run" is adding one listing: one agent call. Everything else (room upload, cutouts, 3D reconstruction, dragging, orbiting) uses zero tokens.</p>
+<p>One "run" is adding one listing: one agent call. Everything else (room upload, cutouts, 3D reconstruction, dragging, walking) uses zero tokens.</p>
 <div class="callout warn"><strong>Price assumption, clearly labelled:</strong> the course pages we could access don't publish a gpt-6-luna price, so we assume small-model list pricing of <strong>$0.40 per 1M input tokens</strong>, $0.10 per 1M cached input, and <strong>$1.60 per 1M output tokens</strong>. Cost scales linearly, so for a different price card multiply each figure below by (real price ÷ assumed price).</div>
 <table>
 <tr><th>Scenario</th><th>Assumption</th><th>Model cost</th></tr>
@@ -196,7 +196,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <h3>Defences actually working</h3>
 <p>The tests replace the model with a fake that returns hostile output, so the defences are exercised without spending tokens. Output of <code>python tests/test_agent_safety.py</code>:</p>
 <pre><code>{{test:agent_safety}}</code></pre>
-{{shot:back-silhouette|Orbiting behind an item with no back photo: Theia shows a grey silhouette and says so, instead of inventing the back.}}
+{{shot:back-silhouette|Walking around an item with no back photo: Theia shows a grey silhouette and says so, instead of inventing the back.}}
 </section>
 
 <!-- 7 · IMPACT -->
@@ -230,7 +230,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <p class="kicker">8 · Limits and next steps</p>
 <h2>Where the prototype stops</h2>
 <ul>
-<li><strong>One photo isn't a 3D scan.</strong> Without the depth model, existing furniture in the photo is painted flat onto the floor and walls when you orbit far from the photo viewpoint. Without floor clicks, the layout is "rough" and the scale assumes a 1.45 m phone height.</li>
+<li><strong>One photo isn't a 3D scan.</strong> Without the depth model, existing furniture in the photo is painted flat onto the floor and walls when you move away from the photo viewpoint, which is why walking is limited to about 2 m. Without floor clicks, the layout is "rough" and the scale assumes a 1.45 m phone height.</li>
 <li><strong>Items are photo cards, not meshes.</strong> They look right from the angles the seller photographed, and show a silhouette elsewhere. That's honest, but not full 3D.</li>
 <li><strong>Cutouts can still fail</strong> when the item is the same colour as the wall behind it (for example a white table against a white wall). The original-photo toggle is the escape hatch.</li>
 <li><strong>Stitched panoramas</strong> are not a single pinhole camera, so 3D from a panorama is approximate. One photo works best.</li>

@@ -207,21 +207,32 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
         near_mid = (m1 * 0.5 + m3) / lam
         pose = _pose_from_up(up, cam_height, far_mid - near_mid)
         refined = None
-        # Four hand-clicked points are rarely a perfect rectangle, which shows
-        # up as a tilted or rolled camera. When the photo has enough straight
-        # vertical edges, trust them for tilt/roll and use the clicks only for
-        # where the floor and walls are.
+        # Four hand-clicked points are rarely a perfect rectangle, and that
+        # error mostly shows up as camera *roll*. Vertical edges in the photo
+        # measure roll reliably, but not pitch: listing photos are often
+        # cropped, which moves the horizon away from the image centre. So we
+        # take roll from the vertical edges and keep the clicks' pitch, then
+        # accept the result only if the room it implies is plausible.
         if rgb is not None:
             vp_up, support = vertical_up_from_lines(rgb, focal)
-            clicks = (far_left, far_right, near_right, near_left)
-            if vp_up is not None and support >= 8 and all(float(vp_up @ np.array([u / focal, v / focal, 1.0])) < -1e-3 for u, v in clicks):
-                trial = _pose_from_up(vp_up, 1.0, far_mid - near_mid)
-                fl_unit, fr_unit = _ray_floor(trial, *far_left, focal), _ray_floor(trial, *far_right, focal)
-                far_len = float(np.linalg.norm(fr_unit - fl_unit)) if fl_unit is not None and fr_unit is not None else 0.0
-                if far_len > 1e-6:
-                    cam_height = dims["width_m"] / far_len if width_confirmed else PHONE_HEIGHT_M
-                    pose = _pose_from_up(vp_up, cam_height, far_mid - near_mid)
-                    refined = f"{support} vertical edges"
+            if vp_up is not None and support >= 6:
+                roll_vp = math.atan2(float(vp_up[0]), float(-vp_up[1]))
+                uz = float(np.clip(up[2], -0.95, 0.95))
+                r = math.sqrt(1 - uz * uz)
+                candidate = _normalize(np.array([r * math.sin(roll_vp), -r * math.cos(roll_vp), uz]))
+                clicks = (far_left, far_right, near_right, near_left)
+                if all(float(candidate @ np.array([u / focal, v / focal, 1.0])) < -1e-3 for u, v in clicks):
+                    trial = _pose_from_up(candidate, 1.0, far_mid - near_mid)
+                    hits = [_ray_floor(trial, u, v, focal) for u, v in clicks]
+                    if all(h is not None for h in hits):
+                        far_len = float(np.linalg.norm(hits[1] - hits[0]))
+                        trial_height = dims["width_m"] / far_len if width_confirmed else PHONE_HEIGHT_M
+                        depth = max(-h[2] for h in hits) * trial_height
+                        width_m = far_len * trial_height
+                        if 0.5 < trial_height < 2.5 and depth < 15 and 1.2 < width_m < 15:
+                            cam_height = trial_height
+                            pose = _pose_from_up(candidate, cam_height, far_mid - near_mid)
+                            refined = f"{support} vertical edges"
         world_corners = []
         for u, v in (far_left, far_right, near_right, near_left):
             hit = _ray_floor(pose, u, v, focal)
@@ -230,7 +241,7 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
             notes.append("The clicked floor corners gave an implausible camera; using automatic estimate instead.")
             pose, world_corners = None, None
         else:
-            layout_source = "clicked floor corners" + (f" + tilt from {refined}" if refined else "")
+            layout_source = "clicked floor corners" + (f" + roll from {refined}" if refined else "")
             if not width_confirmed:
                 dims["width_m"] = float(np.linalg.norm(world_corners[1] - world_corners[0]))
             notes.append(f"Scale from {scale_source}.")
