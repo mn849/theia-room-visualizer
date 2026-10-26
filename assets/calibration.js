@@ -1,0 +1,113 @@
+(function () {
+  function wireCalibration() {
+    const image = document.getElementById('calibration-image');
+    if (!image) return;
+    const reset = document.getElementById('reset-floor');
+    const pointLabels = ['Near left', 'Near right', 'Far right', 'Far left'];
+    const apply = document.getElementById('apply-floor');
+    if (apply && apply.dataset.wired !== 'true') {
+      apply.dataset.wired = 'true';
+      apply.addEventListener('click', function () { image.dataset.locked = 'true'; });
+    }
+    function updateStatus() {
+      const status = document.getElementById('floor-point-status');
+      if (!status) return;
+      let count = 0;
+      for (let i = 1; i <= 4; i += 1) {
+        const x = document.getElementById('corner-' + i + '-x');
+        const y = document.getElementById('corner-' + i + '-y');
+        if (x && y && x.value !== '' && y.value !== '') count += 1;
+      }
+      status.textContent = count + ' of 4 points selected';
+    }
+    function setInputValue(input, value) {
+      if (!input) return;
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      setter.call(input, value);
+      input.dispatchEvent(new Event('input', {bubbles:true}));
+      input.dispatchEvent(new Event('change', {bubbles:true}));
+      input.dispatchEvent(new Event('blur', {bubbles:true}));
+    }
+    function pointFromEvent(event) {
+      const box = image.getBoundingClientRect();
+      return {x: Math.max(0, Math.min(100, (event.clientX - box.left) / box.width * 100)), y: Math.max(0, Math.min(100, (event.clientY - box.top) / box.height * 100))};
+    }
+    function wireMarker(marker, index) {
+      if (marker.dataset.wired === 'true') return;
+      marker.dataset.wired = 'true';
+      marker.addEventListener('pointerdown', function (event) {
+        if (image.dataset.locked === 'true') return;
+        event.preventDefault(); event.stopPropagation(); marker.setPointerCapture(event.pointerId);
+      });
+      marker.addEventListener('pointermove', function (event) {
+        if (!marker.hasPointerCapture(event.pointerId) || image.dataset.locked === 'true') return;
+        event.preventDefault(); event.stopPropagation();
+        const point = pointFromEvent(event);
+        marker.style.left = point.x + '%'; marker.style.top = point.y + '%';
+        setInputValue(document.getElementById('corner-' + index + '-x'), point.x.toFixed(1));
+        setInputValue(document.getElementById('corner-' + index + '-y'), point.y.toFixed(1));
+      });
+      marker.addEventListener('pointerup', function (event) {
+        if (marker.hasPointerCapture(event.pointerId)) marker.releasePointerCapture(event.pointerId);
+      });
+    }
+    if (reset && reset.dataset.wired !== 'true') {
+      reset.dataset.wired = 'true';
+      reset.addEventListener('click', function () {
+        const markers = document.getElementById('floor-markers');
+        if (markers) markers.replaceChildren();
+        image.dataset.locked = 'false';
+        for (let i = 1; i <= 4; i += 1) {
+          const xInput = document.getElementById('corner-' + i + '-x');
+          const yInput = document.getElementById('corner-' + i + '-y');
+          [xInput, yInput].forEach(function (input) {
+            if (!input) return;
+            setInputValue(input, '');
+          });
+        }
+        updateStatus();
+      });
+    }
+    if (image.dataset.wired === 'true') return;
+    image.dataset.wired = 'true';
+    image.addEventListener('load', function () {
+      const markers = document.getElementById('floor-markers');
+      if (markers) markers.replaceChildren();
+      image.dataset.locked = 'false';
+      for (let i = 1; i <= 4; i += 1) {
+        const xInput = document.getElementById('corner-' + i + '-x');
+        const yInput = document.getElementById('corner-' + i + '-y');
+        setInputValue(xInput, '');
+        setInputValue(yInput, '');
+      }
+      updateStatus();
+    });
+    image.addEventListener('click', function (event) {
+      if (!image.src) return;
+      const box = image.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+      const x = Math.max(0, Math.min(100, (event.clientX - box.left) / box.width * 100));
+      const y = Math.max(0, Math.min(100, (event.clientY - box.top) / box.height * 100));
+      for (let i = 1; i <= 4; i += 1) {
+        const xInput = document.getElementById('corner-' + i + '-x');
+        const yInput = document.getElementById('corner-' + i + '-y');
+        if (xInput && yInput && (!xInput.value || !yInput.value)) {
+          [ [xInput, x], [yInput, y] ].forEach(function(pair) {
+            const input = pair[0];
+            setInputValue(input, pair[1].toFixed(1));
+          });
+          const marker = document.createElement('span');
+          marker.className = 'floor-marker'; marker.textContent = pointLabels[i - 1];
+          marker.style.left = x + '%'; marker.style.top = y + '%';
+          const markers = document.getElementById('floor-markers');
+          if (markers) { markers.appendChild(marker); wireMarker(marker, i); }
+          updateStatus();
+          break;
+        }
+      }
+    });
+  }
+  const observer = new MutationObserver(wireCalibration);
+  observer.observe(document.body, {childList:true, subtree:true});
+  document.addEventListener('DOMContentLoaded', wireCalibration);
+})();

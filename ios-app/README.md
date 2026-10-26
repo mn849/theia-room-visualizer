@@ -1,6 +1,6 @@
-# LumaRoom iPhone app
+# Theia iPhone app
 
-This is the primary product surface for room capture. It will be a native SwiftUI app using Apple RoomPlan and ARKit on LiDAR-equipped iPhones.
+This is the primary product surface for room capture. It is a native SwiftUI app using Apple RoomPlan and ARKit on LiDAR-equipped iPhones.
 
 The current machine has Swift command-line tools but does not have the full Xcode application installed, so the Xcode project cannot be built or deployed from this environment yet. The first native implementation should be opened and run on a Mac with Xcode and a supported iPhone.
 
@@ -13,6 +13,10 @@ The current machine has Swift command-line tools but does not have the full Xcod
 - Show a review screen with walls, openings, detected furniture, and dimensions.
 - Save a named room locally.
 - Export a versioned room-model payload for the desktop companion.
+
+## Source scaffold
+
+The Swift files in this folder now cover the first capture loop: start a RoomPlan scan, review walls/openings/objects, save a named room locally, and export a versioned JSON room model. Open the files in an Xcode iOS app target with the `RoomPlan` capability enabled.
 
 ## Device target
 
