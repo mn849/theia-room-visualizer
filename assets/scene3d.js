@@ -377,13 +377,18 @@
       }
     }
     const base = new THREE.Vector3(pc.position.x, 0, pc.position.z);
-    // Up to 15 items: rows of five, each row a little further back.
-    const sideways = ((index % 5) - 2) * 0.75;
+    // Up to 15 items: rows of five (centre first, then alternating left and
+    // right), each row a little further back. A spot is only used if it is on
+    // the floor AND inside the photo's field of view, so new items are always
+    // visible when the 3D view opens.
+    const slot = [0, -1, 1, -2, 2][index % 5];
     let p = null;
-    for (let dist = (item.pose === 'flat' ? 2.0 : 2.4) + Math.floor(index / 5) * 0.9; dist >= 1.0; dist -= 0.2) {
-      const q = base.clone().add(fwd.clone().multiplyScalar(dist)).add(right.clone().multiplyScalar(sideways));
-      const candidate = { x: q.x, z: q.z, yaw: facing, y: item.pose === 'wall' ? 1.0 : 0 };
-      if (footprintInside(entry, candidate)) { p = candidate; break; }
+    for (let spread = 0.75; spread >= 0 && !p; spread -= 0.25) {
+      for (let dist = (item.pose === 'flat' ? 2.0 : 2.4) + Math.floor(index / 5) * 0.9; dist >= 1.0; dist -= 0.2) {
+        const q = base.clone().add(fwd.clone().multiplyScalar(dist)).add(right.clone().multiplyScalar(slot * spread));
+        const candidate = { x: q.x, z: q.z, yaw: facing, y: item.pose === 'wall' ? 1.0 : 0 };
+        if (footprintInside(entry, candidate) && inPhotoView(q, dims)) { p = candidate; break; }
+      }
     }
     if (!p) {
       const q = base.clone().add(fwd.clone().multiplyScalar(1.6));
@@ -391,6 +396,16 @@
     }
     if (item.pose === 'upright') snapToWalls(entry, p);
     return p;
+  }
+
+  // Is an item standing at q (floor point) visible from the photo camera?
+  function inPhotoView(q, dims) {
+    const pc = state.photoCam;
+    const pts = [q.clone().setY(0.02), q.clone().setY(Math.min(dims.h, 1.2))];
+    return pts.every(function (v) {
+      const n = v.clone().project(pc);
+      return n.z < 1 && Math.abs(n.x) < 0.9 && Math.abs(n.y) < 0.95;
+    });
   }
 
   // A saved placement is only reused if it is still in front of the camera
@@ -681,7 +696,7 @@
       resize();
     }
     // Placements belong to one room geometry; start fresh when it changes.
-    if (state.placements._room !== data.room.key) state.placements = { _room: data.room.key };
+    if (state.placements._room !== data.room.key || state.placements._v !== 2) state.placements = { _room: data.room.key, _v: 2 };
     const itemKey = JSON.stringify((data.items || []).map(function (i) { return [i.id, i.pose, i.dims, i.views]; }));
     if (roomChanged || itemKey !== state.itemKey) {
       state.itemKey = itemKey;
