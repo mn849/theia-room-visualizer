@@ -149,6 +149,35 @@ def refine_alpha(rgb: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, dict]:
             alpha[region & (dist <= threshold)] = 0.0  # real see-through gap
             stats["holes_cleared"] += 1
 
+    # See-through gaps the segmenter kept (e.g. the wall visible between a
+    # bench's legs). Compare each pixel with the wall colour at the *same row*
+    # so gradients in lighting do not matter, and clear only sizeable regions
+    # whose average colour matches the wall almost exactly.
+    h, w = alpha.shape
+    band = max(3, int(w * 0.04))
+    row_bg = np.empty((h, 3), np.float32)
+    for y in range(h):
+        edge = np.concatenate([lab[y, :band][alpha[y, :band] < 0.15], lab[y, -band:][alpha[y, -band:] < 0.15]])
+        row_bg[y] = np.median(edge, axis=0) if len(edge) >= 3 else bg
+    row_bg = cv2.blur(row_bg[:, None, :], (1, 15))[:, 0, :]
+    row_dist = np.linalg.norm(lab - row_bg[:, None, :], axis=2)
+    border_noise = float(np.median(np.concatenate([row_dist[:, :band].ravel(), row_dist[:, -band:].ravel()])))
+    tau = max(6.0, border_noise * 2.5)
+    solid_area = max(1, int((alpha >= 0.5).sum()))
+    candidate = ((alpha >= 0.5) & (row_dist < tau)).astype(np.uint8)
+    count, labels, comp_stats, _ = cv2.connectedComponentsWithStats(candidate, connectivity=8)
+    to_clear = np.zeros_like(candidate, dtype=bool)
+    for index in range(1, count):
+        if comp_stats[index, cv2.CC_STAT_AREA] < max(150, int(h * w * 0.002)):
+            continue
+        region = labels == index
+        if float(row_dist[region].mean()) < tau * 0.6:
+            to_clear |= region
+    if 0 < to_clear.sum() < 0.7 * solid_area:  # never strip most of an item
+        alpha[to_clear] = 0.0
+        alpha = np.minimum(alpha, np.maximum(cv2.GaussianBlur((~to_clear).astype(np.float32), (0, 0), 0.8), 0))
+        stats["gaps_cleared"] = int(to_clear.sum())
+
     # Weak-alpha pixels attached to the item that clearly differ from a uniform
     # background are item pixels (common on cream upholstery).
     if spread < 12:

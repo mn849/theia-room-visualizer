@@ -1,0 +1,28 @@
+# Test run Mon Oct 26 12:38:45 EDT 2026
+
+$ python tests/test_geometry.py
+(1.45, -12, 0, 0) height 1.45 pitch -12.0 roll 0.0 clicked floor corners EXIF 35 mm focal length
+(1.2, -20, 3, 10) height 1.2 pitch -20.0 roll 3.0 clicked floor corners EXIF 35 mm focal length
+(1.6, -8, -2, -15) height 1.6 pitch -8.0 roll -2.0 clicked floor corners EXIF 35 mm focal length
+focal from VPs 3028 true 3028 floor-corner vanishing points
+prior height 1.45 derived width 3.6
+reprojection ok
+vertical VP lines 61 error deg 0.05
+auto pitch -9.95 roll 2.49 vertical edges in the photo (61 lines)
+geometry tests passed
+depth alignment median rel error 0.0028
+depth alignment test passed
+
+$ python tests/test_cutout.py
+{'holes_restored': 1, 'holes_cleared': 9, 'specks_removed': 1} seat restored: 1.0 gap clear: 0.0 speck: 0.0 leg: 1.0
+enclosed wall gap -> 0.0
+{'width': 800, 'height': 600, 'method': 'GrabCut fallback (install a segmentation model for sharper edges)', 'holes_restored': 0, 'holes_cleared': 9, 'specks_removed': 0, 'coverage': 0.103, 'edge_contact': 0.0, 'ok': True, 'aspect': 1.073}
+cut size (441, 411)
+cutout tests passed
+
+$ python tests/test_agent_safety.py
+1 hijacked reply -> {'category': 'armchairarmchairarmchairarmchairarmchair', 'pose': 'upright', 'flags': '5 flags, max 120 chars', 'source': 'gpt-6-luna'}
+2 description sent: 6000 chars of 20147 ; prompt says ignore instructions: True
+3 broken reply -> {'category': 'rug', 'pose': 'flat', 'flags': [], 'source': 'deterministic fallback'}
+4 log statuses: ['success', 'error'] ; key in log: False
+agent safety tests passed
