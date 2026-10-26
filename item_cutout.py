@@ -48,6 +48,9 @@ except Exception:
     _estimate_foreground = None
 
 MAX_SIDE = 1600
+# U2-Net gives ghosted upholstery ~0.1-0.4 alpha but wall seen through a
+# chair ~0.02-0.08; measured on a real Marketplace bench photo.
+WEAK_ALPHA = 0.09
 MODEL_PREFERENCE = ("birefnet-general-lite", "isnet-general-use", "u2net")
 _sessions: dict[str, object] = {}
 
@@ -102,6 +105,106 @@ def _grabcut_alpha(rgb: np.ndarray) -> np.ndarray:
     hard = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 1.0, 0.0).astype(np.float32)
     soft = cv2.resize(hard, (width, height), interpolation=cv2.INTER_LINEAR)
     return cv2.GaussianBlur(soft, (0, 0), max(0.6, 0.6 / scale))
+
+
+def model_guided_grabcut(rgb: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, dict]:
+    """Recover item parts the segmentation model was unsure about.
+
+    General models such as U2-Net often give patterned upholstery, dark
+    aprons or glass a weak alpha, which makes the seat of a chair look
+    "ghosted". We use the model only as a prior: confident pixels are fixed
+    foreground, the frame border is fixed background, and everything inside
+    the item's outline is decided by GrabCut's colour models. A tapestry seat
+    does not look like the wall or the floor, so it is kept; the wall seen
+    between legs does, so it is removed.
+    """
+    info: dict = {}
+    if cv2 is None:
+        return alpha, info
+    h, w = alpha.shape
+    solid = (alpha >= 0.6).astype(np.uint8)
+    if solid.sum() < 0.01 * h * w:
+        return alpha, info
+    mask = np.full((h, w), cv2.GC_PR_BGD, np.uint8)
+    # Everything inside the item's silhouette hull is a candidate.
+    contours, _ = cv2.findContours(solid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    hull = cv2.convexHull(np.vstack(contours))
+    inside = np.zeros((h, w), np.uint8)
+    cv2.fillConvexPoly(inside, hull, 1)
+    # Where the model saw *something* (even faintly) the pixel is a candidate;
+    # where it saw nothing, GrabCut must find strong colour evidence.
+    mask[alpha >= WEAK_ALPHA] = cv2.GC_PR_FGD
+    sure = cv2.erode((alpha >= 0.9).astype(np.uint8), np.ones((3, 3), np.uint8))
+    mask[sure > 0] = cv2.GC_FGD
+    far = cv2.dilate(inside, np.ones((15, 15), np.uint8)) == 0
+    mask[far & (alpha < 0.02)] = cv2.GC_BGD
+    band = max(3, int(min(h, w) * 0.02))
+    edge = np.zeros((h, w), bool)
+    edge[:band, :] = edge[-band:, :] = True
+    edge[:, :band] = edge[:, -band:] = True
+    mask[edge & (alpha < 0.5)] = cv2.GC_BGD
+    bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+    try:
+        cv2.grabCut(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), mask, None, bgd, fgd, 5, cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return alpha, info
+    grab = ((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD)).astype(np.float32)
+    grab = cv2.GaussianBlur(grab, (0, 0), 0.7)
+    # Keep the model's soft edges where it was confident; take GrabCut's
+    # decision where the model hesitated.
+    # GrabCut may only promote pixels the model gave a weak-but-real signal;
+    # near-zero pixels (wall seen through the item) stay background.
+    unsure = (alpha >= WEAK_ALPHA) & (alpha < 0.85)
+    refined = alpha.copy()
+    refined[unsure] = grab[unsure]
+    # GrabCut can keep pockets of wall/floor seen *through* the item (e.g.
+    # the wall under a bench seat) because they are enclosed. Compare every
+    # pixel the model was unsure about with a colour palette of the known
+    # background and clear sizeable pockets that match it. Pixels the model
+    # was confident about (legs, frame) are never touched.
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
+    lab[:, :, 0] *= 0.5  # tolerate shadows: wall in shade is darker, not a different colour
+    known_bg = lab[(alpha < 0.02) & (inside == 0)]
+    if len(known_bg) > 200:
+        sample = known_bg[np.random.default_rng(0).choice(len(known_bg), min(20000, len(known_bg)), replace=False)]
+        k = 8
+        _, _, centres = cv2.kmeans(sample, k, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 0.5), 2, cv2.KMEANS_PP_CENTERS)
+        nearest = np.min(np.linalg.norm(lab[:, :, None, :] - centres[None, None, :, :], axis=3), axis=2)
+        tau = 11.0
+        pocket = ((refined >= 0.5) & (alpha < 0.5) & (nearest < tau)).astype(np.uint8)
+        pocket = cv2.morphologyEx(pocket, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(pocket, connectivity=8)
+        cleared = 0
+        for index in range(1, count):
+            if stats[index, cv2.CC_STAT_AREA] < max(60, int(h * w * 0.0015)):
+                continue
+            region = labels == index
+            if float(nearest[region].mean()) < tau * 0.8:
+                refined[region] = 0.0
+                cleared += int(region.sum())
+        if cleared:
+            refined = np.minimum(refined, cv2.GaussianBlur((refined > 0.02).astype(np.float32), (0, 0), 0.7) + (alpha >= 0.85))
+        info["background_pockets_cleared_px"] = cleared
+    # Small enclosed specks inside recovered fabric (pale flowers in a
+    # pattern) where the model still saw a faint signal are part of the item.
+    fg = (refined >= 0.5).astype(np.uint8)
+    padded = np.pad(1 - fg, 1, constant_values=1)
+    flood = np.zeros((padded.shape[0] + 2, padded.shape[1] + 2), np.uint8)
+    cv2.floodFill(padded, flood, (0, 0), 2)
+    enclosed = (padded[1:-1, 1:-1] == 1).astype(np.uint8)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(enclosed, connectivity=4)
+    filled = 0
+    for index in range(1, count):
+        if stats[index, cv2.CC_STAT_AREA] > h * w * 0.004:
+            continue
+        region = labels == index
+        if float(np.median(alpha[region])) >= 0.05:
+            refined[region] = 1.0
+            filled += 1
+    info["pattern_holes_filled"] = filled
+    info["recovered_px"] = int(((refined >= 0.5) & (alpha < 0.5)).sum())
+    info["removed_px"] = int(((refined < 0.5) & (alpha >= 0.5)).sum())
+    return refined, info
 
 
 def _background_lab(lab: np.ndarray, alpha: np.ndarray) -> tuple[np.ndarray, float]:
@@ -223,7 +326,9 @@ def make_cutout(image: Image.Image) -> tuple[Image.Image, dict]:
     if model:
         try:
             alpha = _model_alpha(image, model)
-            report["method"] = f"{model} segmentation"
+            report["method"] = f"{model} segmentation + colour-guided repair"
+            alpha, repair = model_guided_grabcut(rgb, alpha)
+            report.update(repair)
         except Exception as exc:  # fall through to GrabCut
             report["model_error"] = type(exc).__name__
     if alpha is None:
