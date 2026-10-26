@@ -31,11 +31,11 @@ The preview is a 3D reconstruction of your room photo that opens at the exact vi
 
 ## Up to 15 items, saved on this device
 
-Add up to 15 listings to one room; they stay where you put them when you add more. Rooms, items, positions and hearts are saved in the browser (local storage), so they are still there after a reload or restart. Images are kept on the server for 7 days (`THEIA_MEDIA_TTL_HOURS`). At 15 items Theia asks you to remove one before adding another.
+Add up to 15 listings to one room; they stay where you put them when you add more. Rooms, items, positions and hearts are saved in the browser (local storage), so they are still there after a reload or restart. Images are kept on the server for 7 days (`THEIA_MEDIA_TTL_HOURS`). At 15 items Theia asks you to remove one before adding another. A **History** panel under *Add item to room* lists every listing you've tried this session, with **Add back** for anything you removed. Listings showing several pieces (a pair of bedside tables, a set of chairs) are split into separate items you can move and rotate individually.
 
 ## Heart an item → message the seller
 
-Click **♡ Love it** on an item card to save it. Theia drafts a short 2–4 sentence first message to the seller: it asks if the item is still available, asks for any measurement the listing is missing, and offers to pick it up. You can edit the text, choose **Try another wording**, **Copy message**, and open the listing to paste it into Messenger. Theia never sends messages itself. Drafts come from `message_agent.py` (gpt-6-luna). The agent never invents a price or condition, and its reply is rejected if it isn't 2–4 sentences or contains a link or phone number. With no API key it uses a natural-sounding template instead.
+Choose an item under **Orientation**, then click **♡ Love it** to save it. Theia drafts a short 2–4 sentence first message to the seller: it asks if the item is still available, asks for any measurement the listing is missing, and offers to pick it up. You can edit the text, choose **Try another wording**, **Copy message**, and open the listing to paste it into Messenger. Theia never sends messages itself. Drafts come from `message_agent.py` (gpt-6-luna). The agent never invents a price or condition, and its reply is rejected if it isn't 2–4 sentences or contains a link or phone number. With no API key it uses a natural-sounding template instead.
 
 ### Optional local models (not needed to run the app)
 

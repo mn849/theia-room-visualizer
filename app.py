@@ -250,6 +250,8 @@ def infer_item_dimensions(title: str, description: str) -> tuple[dict[str, float
         complete = all(key in labels for key in ("width_m", "height_m", "depth_m"))
         return labels, "seller-stated dimensions" + (" (partial)" if not complete else ""), "High for the fields supplied by the seller; depth is missing" if not complete else "High when the listing dimensions are complete and truthful"
     priors = {
+        "nightstand": {"width_m": 0.5, "height_m": 0.6, "depth_m": 0.4}, "bedside": {"width_m": 0.5, "height_m": 0.6, "depth_m": 0.4},
+        "birdcage": {"width_m": 0.5, "height_m": 1.4, "depth_m": 0.45}, "mirror": {"width_m": 0.7, "height_m": 1.0, "depth_m": 0.05},
         "sofa": {"width_m": 2.1, "height_m": 0.85, "depth_m": 0.9}, "couch": {"width_m": 2.1, "height_m": 0.85, "depth_m": 0.9},
         "chair": {"width_m": 0.8, "height_m": 0.85, "depth_m": 0.8}, "armchair": {"width_m": 0.85, "height_m": 0.9, "depth_m": 0.85}, "bench": {"width_m": 1.2, "height_m": 0.8, "depth_m": 0.45}, "stool": {"width_m": 0.45, "height_m": 0.6, "depth_m": 0.45},
         "table": {"width_m": 1.4, "height_m": 0.75, "depth_m": 0.8}, "desk": {"width_m": 1.3, "height_m": 0.75, "depth_m": 0.7},
@@ -422,6 +424,7 @@ app.layout = html.Div([
     dcc.Store(id="item-library-data", storage_type="local", data=[]),
     dcc.Store(id="overlay-positions", storage_type="local", data={}),
     dcc.Store(id="positions-sink", data=None),
+    dcc.Store(id="item-history", storage_type="session", data=[]),
     dcc.Store(id="scene-data", data=None),
     dcc.Store(id="item-placements", storage_type="local", data={}),
     dcc.Store(id="scene-sink", data=None),
@@ -453,12 +456,22 @@ app.layout = html.Div([
                 dcc.Input(id="listing-url", type="url", placeholder="Paste a Facebook Marketplace listing URL", className="text-input"),
                 dcc.Input(id="image-url", type="url", placeholder="Optional direct item-image URL", className="text-input"),
                 dcc.Upload(id="item-upload", children=html.Div([html.Strong("Or upload a listing screenshot"), html.Span("PNG or JPG", className="upload-help")], className="compact-upload"), className="compact-upload-zone"),
-                html.Button("Add item to room", id="add-item", className="primary-button"), html.Div(id="item-note", className="file-note"),
+                html.Button("Add item to room", id="add-item", className="primary-button"), dcc.Loading(html.Div(id="item-note", className="file-note"), type="dot", color="#1e5a4c"),
+                html.Details([html.Summary(id="history-summary", children="History of items you've tried"), html.Div(id="history-list", className="history-list")], className="history-panel", open=True),
             ], className="capture-panel"),
             html.Div([
                 html.Div([html.Div([html.P("PREVIEW", className="eyebrow"), html.H2("Your room"), dcc.RadioItems(id="view-mode", options=[{"label": "2D photo", "value": "2d"}, {"label": "3D room", "value": "3d"}], value="2d", inline=True, className="view-mode-toggle", persistence=True, persistence_type="session")], className="preview-title"), html.Div([html.Div(id="scene3d", className="scene3d"), html.Div(id="stage", children=empty_stage(), className="preview-canvas")], id="preview-wrap", className="preview-wrap"), html.Div(id="scene-notes", className="scene-notes")]),
                 html.Div(id="item-library", className="item-library"),
                 html.Div([html.P("ORIENTATION", className="eyebrow"), dcc.Dropdown(id="item-select", options=[], placeholder="Choose an item", clearable=False, className="item-select"), dcc.Dropdown(id="item-pose", options=[{"label":"Standing / upright", "value":"upright"}, {"label":"Flat on the floor", "value":"flat"}, {"label":"Facing the wall", "value":"wall"}], value="upright", clearable=False, className="item-select"), dcc.Slider(id="item-rotation", min=-180, max=180, step=1, value=0, marks={-180: "−180°", 0: "Straight", 180: "+180°"}, tooltip={"placement": "bottom", "always_visible": True}), html.Small("Choose how the object sits in the room, then rotate it (or press Q / E in the 3D view). Upright items snap flush to a wall when dragged close to it; rugs lie flat; art hangs on walls.", className="control-note")], className="orientation-controls"),
+                html.Div([
+                    html.P("LOVE IT? MESSAGE THE SELLER", className="eyebrow"),
+                    html.Div([html.Button("♡ Love it", id="heart-selected", n_clicks=0, className="heart-button"), html.Span(id="heart-status", className="control-note")], className="seller-actions"),
+                    html.Div([
+                        dcc.Textarea(id="seller-message", value="", className="seller-message", rows=4),
+                        html.Div([html.Button("Copy message", id="copy-message", n_clicks=0, className="secondary-button small-button"), html.Button("Try another wording", id="redraft-message", n_clicks=0, className="clear-button small-button"), html.A("Open listing on Facebook ↗", id="listing-link", href="#", target="_blank", rel="noopener noreferrer", className="listing-link")], className="seller-actions"),
+                        html.Small(id="seller-note", className="control-note"),
+                    ], id="seller-draft", style={"display": "none"}),
+                ], className="seller-panel"),
                 html.Button("Clear saved items", id="clear-items", className="clear-button"),
                 html.Div(id="item-details", className="item-details"), html.Div(id="metrics", children=[metric("ROOM", "Not added", "Upload a photo"), metric("ITEM", "Not added", "Paste a URL or image"), metric("FAITHFULNESS", "Source image", "No generated details")], className="metrics"),
             ], className="model-panel"),
@@ -560,8 +573,25 @@ def calibrate_room(_, measurement_type, measurement, unit, calibration):
     return {"dimensions_m": dimensions, "source": f"user-confirmed {labels.get(measurement_type, 'room')}"}, f"Scale calibrated with {measurement:g} {unit} ({metres:.2f} m) for this session."
 
 
-@app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), prevent_initial_call=True)
-def add_item(_, listing_url, image_url, upload_contents, library):
+@app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Output("item-history", "data"), Output("listing-url", "value"), Output("image-url", "value"), Output("item-upload", "contents"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), State("item-history", "data"), prevent_initial_call=True)
+def add_item(_, listing_url, image_url, upload_contents, library, history):
+    """Add a listing to the room, keeping every item already there.
+
+    Returns (library, note, history, cleared URL, cleared image URL, cleared
+    upload) so a previous screenshot can never be reused for the next link.
+    """
+    result = _add_item(listing_url, image_url, upload_contents, library)
+    new_library, note = result
+    if new_library is no_update:
+        return no_update, note, no_update, no_update, no_update, no_update
+    added = [item for item in new_library if item["id"] not in {old["id"] for old in library or []}]
+    history = list(history or [])
+    known = {entry["id"] for entry in history}
+    history = [{"id": item["id"], "added_at": datetime.now(timezone.utc).isoformat(), "item": item} for item in added if item["id"] not in known] + history
+    return new_library, note, history[:60], "", "", None
+
+
+def _add_item(listing_url, image_url, upload_contents, library):
     if not listing_url and not image_url and not upload_contents:
         return no_update, "Add a listing URL, direct image URL, or screenshot first."
     if len(library or []) >= MAX_ITEMS:
@@ -611,9 +641,33 @@ def add_item(_, listing_url, image_url, upload_contents, library):
     agent_note = f" · agent: {agent_result.get('category', 'other')}"
     if agent_result.get("flags"):
         agent_note += " · " + "; ".join(agent_result["flags"][:2])
-    item = {"id": f"item-{uuid4().hex[:8]}", "src": hero["cutout"], "original_src": hero["photo"], "display": "cutout" if hero["cutout_ok"] else "photo", "gallery": gallery, "title": title, "raw_description": description, "listing_url": listing_url, "source_note": note + agent_note, "dimensions": dimensions, "dimension_source": dimension_source, "dimension_confidence": dimension_confidence, "visual_scale": visual_scale, "pose": pose, "rotation": 0, "agent": agent_result}
-    updated = [item] + (library or [])
-    return updated[:MAX_ITEMS], f"Added {title} ({len(updated)} of {MAX_ITEMS} items in this room). Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
+    base_item = {"id": f"item-{uuid4().hex[:8]}", "src": hero["cutout"], "original_src": hero["photo"], "display": "cutout" if hero["cutout_ok"] else "photo", "gallery": gallery, "title": title, "raw_description": description, "listing_url": listing_url, "source_note": note + agent_note, "dimensions": dimensions, "dimension_source": dimension_source, "dimension_confidence": dimension_confidence, "visual_scale": visual_scale, "pose": pose, "rotation": 0, "agent": agent_result}
+    # A listing can show several pieces (a pair of bedside tables, a set of
+    # chairs). Split the cutout into one item per piece so each can be moved
+    # and rotated on its own.
+    expected = item_cutout.listing_quantity(title, description)
+    new_items = [base_item]
+    if hero.get("cutout_ok"):
+        try:
+            pieces = item_cutout.split_pieces(media_store.open_image(hero["cutout"]), expected)
+        except Exception:
+            pieces = []
+        free = MAX_ITEMS - len(library or [])
+        if len(pieces) >= 2 and len(pieces) <= free:
+            group = base_item["id"]
+            new_items = []
+            for k, piece in enumerate(pieces, start=1):
+                url = media_store.save_image(piece, "PNG")
+                aspect = round(piece.width / max(1, piece.height), 4)
+                view = {**hero, "cutout": url, "aspect": aspect, "view": "front"}
+                new_items.append({**base_item, "id": f"{group}-{k}", "group": group, "src": url, "gallery": [view], "title": f"{title} ({k} of {len(pieces)})", "display": "cutout"})
+            log_pipeline({"stage": "split_listing", "pieces": len(pieces), "seller_quantity": expected})
+    if len(library or []) + len(new_items) > MAX_ITEMS:
+        return no_update, f"This listing has {len(new_items)} pieces but only {MAX_ITEMS - len(library or [])} of {MAX_ITEMS} spaces are free. Remove some items first."
+    updated = new_items + (library or [])
+    item = new_items[0]
+    split_note = f" Split into {len(new_items)} separate pieces you can move individually." if len(new_items) > 1 else ""
+    return updated[:MAX_ITEMS], f"Added {title}{split_note} ({len(updated)} of {MAX_ITEMS} items in this room). Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
 
 
 @app.callback(Output("item-library-data", "data", allow_duplicate=True), Output("item-note", "children", allow_duplicate=True), Input("clear-items", "n_clicks"), prevent_initial_call=True)
@@ -624,7 +678,10 @@ def clear_items(_):
 @app.callback(Output("item-library-data", "data", allow_duplicate=True), Output("item-note", "children", allow_duplicate=True), Input({"type": "remove-item", "index": ALL}, "n_clicks"), State("item-library-data", "data"), prevent_initial_call=True)
 def remove_item(_, items):
     trigger = ctx.triggered_id
-    if not trigger or not items:
+    # Re-rendering the item cards creates new Remove buttons with n_clicks=0,
+    # which also triggers this callback. Only a real click (value > 0) counts;
+    # without this guard, adding a new listing silently removed older items.
+    if not trigger or not items or not ctx.triggered or not ctx.triggered[0].get("value"):
         return no_update, no_update
     remaining = [item for item in items if item.get("id") != trigger.get("index")]
     return remaining, "Item removed from this session."
@@ -781,91 +838,106 @@ def item_card(item: dict):
         html.Div([html.Img(src=hero["cutout"] if item.get("display", "cutout") == "cutout" else hero["photo"], className="item-card-image"), html.Div([html.Strong(item.get("title", "Untitled item")), html.Small(f"{size} · {item.get('dimension_source', 'unscaled')}"), html.Small(f"Cutout: {hero.get('method', 'n/a')}", className="cutout-method")], className="item-card-copy")], className="item-card-head"),
         dcc.RadioItems(id={"type": "item-display", "index": item["id"]}, options=[{"label": "Cutout (background removed)", "value": "cutout"}, {"label": "Original seller photo", "value": "photo"}], value=item.get("display", "cutout"), inline=True, className="display-toggle"),
         html.Details([html.Summary(f"Listing photos & angles ({len(gallery)})"), html.Small("Tell Theia which side each photo shows; the 3D view switches to the real photo nearest your viewing angle.", className="control-note"), views], className="view-details"),
-        seller_message_panel(item),
         html.Button("Remove", id={"type": "remove-item", "index": item["id"]}, className="remove-item", n_clicks=0),
     ], className="item-card" + (" is-hearted" if item.get("hearted") else ""))
 
 
-def seller_message_panel(item: dict):
-    """Heart button + editable draft message. Theia never sends anything."""
+def _selected(items, selected_id):
+    return next((item for item in items or [] if item.get("id") == selected_id), None)
+
+
+# The heart + message panel uses fixed component ids (one panel for the
+# selected item) instead of a button inside every item card. Pattern-matched
+# buttons are re-created on every re-render, which made clicks unreliable.
+@app.callback(Output("heart-selected", "children"), Output("heart-selected", "className"), Output("heart-status", "children"), Output("seller-draft", "style"), Output("seller-message", "value"), Output("seller-note", "children"), Output("listing-link", "href"), Output("listing-link", "style"), Input("item-select", "value"), Input("item-library-data", "data"))
+def show_seller_panel(selected_id, items):
+    item = _selected(items, selected_id)
+    if not item:
+        return "♡ Love it", "heart-button", "Add an item and choose it above first.", {"display": "none"}, "", "", "#", {"display": "none"}
     hearted = bool(item.get("hearted"))
-    heart = html.Button("♥ Saved" if hearted else "♡ Love it", id={"type": "heart-item", "index": item["id"]}, n_clicks=0, className="heart-button" + (" on" if hearted else ""), title="Heart this item to save it and draft a message to the seller")
-    if not hearted:
-        return html.Div([heart, html.Small("Heart it to get a ready-to-send message for the seller.", className="control-note")], className="seller-panel")
     message = item.get("seller_message") or {}
-    actions = [
-        html.Button("Copy message", id={"type": "copy-msg", "index": item["id"]}, n_clicks=0, className="secondary-button small-button"),
-        html.Button("Try another wording", id={"type": "redraft-msg", "index": item["id"]}, n_clicks=0, className="clear-button small-button"),
-    ]
-    if item.get("listing_url"):
-        actions.append(html.A("Open listing on Facebook ↗", href=item["listing_url"], target="_blank", rel="noopener noreferrer", className="listing-link"))
-    return html.Div([
-        heart,
-        html.P("MESSAGE TO THE SELLER", className="eyebrow seller-eyebrow"),
-        dcc.Textarea(id={"type": "seller-msg", "index": item["id"]}, value=message.get("text", ""), className="seller-message", rows=4),
-        html.Div(actions, className="seller-actions"),
-        html.Small(f"Drafted by {message.get('source', 'Theia')}. Edit anything, then copy it into Messenger. Theia never sends messages for you.", className="control-note"),
-    ], className="seller-panel")
+    name = item.get("title", "this item")[:60]
+    link_style = {} if item.get("listing_url") else {"display": "none"}
+    status = f"Saved {name}. Here's a message you can send:" if hearted else f"for {name}"
+    return ("♥ Loved" if hearted else "♡ Love it"), ("heart-button on" if hearted else "heart-button"), status, ({"display": "block"} if hearted else {"display": "none"}), message.get("text", ""), f"Drafted by {message.get('source', 'Theia')}. Edit anything, then copy it into Messenger. Theia never sends messages for you.", item.get("listing_url") or "#", link_style
 
 
-@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input({"type": "heart-item", "index": ALL}, "n_clicks"), State("item-library-data", "data"), prevent_initial_call=True)
-def toggle_heart(clicks, items):
-    if not ctx.triggered_id or not items or not any(clicks or []):
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input("heart-selected", "n_clicks"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
+def heart_selected(n_clicks, selected_id, items):
+    item = _selected(items, selected_id)
+    if not n_clicks or not item:
         return no_update
-    item_id = ctx.triggered_id["index"]
-    updated = []
-    for item in items:
-        if item.get("id") == item_id:
-            hearted = not item.get("hearted")
-            item = {**item, "hearted": hearted}
-            if hearted and not (item.get("seller_message") or {}).get("text"):
-                try:
-                    item["seller_message"] = draft_seller_message(item)
-                except Exception as exc:  # never lose the heart because drafting failed
-                    log_pipeline({"stage": "heart", "error": type(exc).__name__, "detail": str(exc)[:200]})
-                    item["seller_message"] = {"text": "Hi! Is this still available? I'd love to come and pick it up if so.", "source": "template (drafting error)"}
-            log_pipeline({"stage": "heart", "hearted": hearted})
-        updated.append(item)
-    return updated
+    hearted = not item.get("hearted")
+    updated_item = {**item, "hearted": hearted}
+    if hearted and not (item.get("seller_message") or {}).get("text"):
+        try:
+            updated_item["seller_message"] = draft_seller_message(item)
+        except Exception as exc:  # never lose the heart because drafting failed
+            log_pipeline({"stage": "heart", "error": type(exc).__name__, "detail": str(exc)[:200]})
+            updated_item["seller_message"] = {"text": "Hi! Is this still available? I'd love to come and pick it up if so.", "source": "template (drafting error)"}
+    log_pipeline({"stage": "heart", "hearted": hearted, "source": (updated_item.get("seller_message") or {}).get("source")})
+    return [updated_item if it.get("id") == selected_id else it for it in items]
 
 
-@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input({"type": "redraft-msg", "index": ALL}, "n_clicks"), State("item-library-data", "data"), prevent_initial_call=True)
-def redraft_message(clicks, items):
-    if not ctx.triggered_id or not items or not any(clicks or []):
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input("redraft-message", "n_clicks"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
+def redraft_selected(n_clicks, selected_id, items):
+    item = _selected(items, selected_id)
+    if not n_clicks or not item:
         return no_update
-    item_id = ctx.triggered_id["index"]
-    updated = []
-    for item in items:
-        if item.get("id") == item_id:
-            attempt = int((item.get("seller_message") or {}).get("attempt", 0)) + 1
-            item = {**item, "seller_message": {**draft_seller_message(item, redraft=attempt), "attempt": attempt}}
-        updated.append(item)
-    return updated
+    attempt = int((item.get("seller_message") or {}).get("attempt", 0)) + 1
+    new = {**item, "hearted": True, "seller_message": {**draft_seller_message(item, redraft=attempt), "attempt": attempt}}
+    return [new if it.get("id") == selected_id else it for it in items]
 
 
-@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input({"type": "seller-msg", "index": ALL}, "n_blur"), State({"type": "seller-msg", "index": ALL}, "value"), State("item-library-data", "data"), prevent_initial_call=True)
-def save_message_edit(_, values, items):
-    if not ctx.triggered_id or not items:
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input("seller-message", "n_blur"), State("seller-message", "value"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
+def save_selected_message(n_blur, value, selected_id, items):
+    item = _selected(items, selected_id)
+    if not n_blur or not item or value is None or (item.get("seller_message") or {}).get("text") == value:
         return no_update
-    item_id = ctx.triggered_id["index"]
-    value = next((entry.get("value") for entry in ctx.states_list[0] if entry["id"]["index"] == item_id), None)
-    current = next((item for item in items if item.get("id") == item_id), None)
-    if current is None or value is None or (current.get("seller_message") or {}).get("text") == value:
-        return no_update
-    return [{**item, "seller_message": {**(item.get("seller_message") or {}), "text": value[:1000], "source": "you (edited)"}} if item.get("id") == item_id else item for item in items]
+    new = {**item, "seller_message": {**(item.get("seller_message") or {}), "text": value[:1000], "source": "you (edited)"}}
+    return [new if it.get("id") == selected_id else it for it in items]
 
 
 app.clientside_callback(
-    """function(clicks, values) {
-        const trig = window.dash_clientside.callback_context.triggered_id;
-        const ids = window.dash_clientside.callback_context.outputs_list.map(o => o.id.index);
-        if (!trig) { return ids.map(() => window.dash_clientside.no_update); }
-        const i = ids.indexOf(trig.index);
-        if (i >= 0 && navigator.clipboard) { navigator.clipboard.writeText(values[i] || ''); }
-        return ids.map((id, k) => k === i ? 'Copied ✓' : 'Copy message');
+    """function(n, value) {
+        if (!n) { return window.dash_clientside.no_update; }
+        if (navigator.clipboard) { navigator.clipboard.writeText(value || ''); }
+        return 'Copied ✓';
     }""",
-    Output({"type": "copy-msg", "index": ALL}, "children"), Input({"type": "copy-msg", "index": ALL}, "n_clicks"), State({"type": "seller-msg", "index": ALL}, "value"), prevent_initial_call=True,
+    Output("copy-message", "children"), Input("copy-message", "n_clicks"), State("seller-message", "value"), prevent_initial_call=True,
 )
+
+
+@app.callback(Output("history-list", "children"), Output("history-summary", "children"), Input("item-history", "data"), Input("item-library-data", "data"))
+def show_history(history, items):
+    history = history or []
+    in_room = {item.get("id") for item in items or []}
+    if not history:
+        return html.Small("Every listing you add this session is listed here, even after you remove it from the room.", className="library-empty"), "History of items you've tried (0)"
+    rows = []
+    for entry in history:
+        item = entry.get("item", {})
+        present = entry["id"] in in_room
+        rows.append(html.Div([
+            html.Img(src=item.get("src"), className="history-thumb"),
+            html.Div([html.Strong(item.get("title", "Item")[:70]), html.Small(("In your room" if present else "Not in the room") + (" · ♥" if item.get("hearted") else ""))], className="history-copy"),
+            html.Button("In room" if present else "Add back", id={"type": "history-add", "index": entry["id"]}, n_clicks=0, disabled=present, className="clear-button small-button"),
+        ], className="history-row"))
+    return rows, f"History of items you've tried ({len(history)})"
+
+
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Output("item-note", "children", allow_duplicate=True), Input({"type": "history-add", "index": ALL}, "n_clicks"), State("item-history", "data"), State("item-library-data", "data"), prevent_initial_call=True)
+def add_back_from_history(_, history, items):
+    # Only a real click counts (re-rendered buttons arrive with n_clicks=0).
+    if not ctx.triggered_id or not ctx.triggered or not ctx.triggered[0].get("value"):
+        return no_update, no_update
+    items = items or []
+    if len(items) >= MAX_ITEMS:
+        return no_update, f"Your room already has {MAX_ITEMS} items. Remove one before adding another."
+    entry = next((e for e in history or [] if e["id"] == ctx.triggered_id["index"]), None)
+    if not entry or any(item.get("id") == entry["id"] for item in items):
+        return no_update, no_update
+    return [entry["item"]] + items, f"Added {entry['item'].get('title', 'item')} back to the room ({len(items) + 1} of {MAX_ITEMS})."
 
 
 @app.callback(Output("stage", "children"), Output("item-details", "children"), Output("metrics", "children"), Output("item-library", "children"), Output("item-select", "options"), Output("item-select", "value"), Input("room-state", "data"), Input("item-library-data", "data"), Input("room-calibration", "data"), State("item-select", "value"), State("overlay-positions", "data"))

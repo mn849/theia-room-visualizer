@@ -68,3 +68,7 @@ body{background:var(--paper);font-family:'DM Sans',Arial,sans-serif;color:var(--
 .seller-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.small-button{width:auto;padding:8px 12px;font-size:11px;margin:0}
 .listing-link{font-size:11px;color:var(--green);font-weight:600;text-decoration:none}.listing-link:hover{text-decoration:underline}
 .item-card.is-hearted{border-color:#e3b48f}.saved-item.is-hearted span{color:#b5523b}
+.history-panel{margin-top:14px;border:1px solid var(--line);padding:10px 12px;background:#fbfaf6}.history-panel summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--green)}
+.history-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;max-height:320px;overflow:auto}
+.history-row{display:grid;grid-template-columns:46px 1fr auto;gap:10px;align-items:center;font-size:11px}.history-thumb{width:46px;height:46px;object-fit:contain;background:#f1eee6}
+.history-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.history-copy strong{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-copy small{color:var(--muted)}

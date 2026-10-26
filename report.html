@@ -115,13 +115,13 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <p>The run below uses a real listing, a vintage spindle-arm bench with floral tapestry, added to a real room photo. Log lines are copied from <code>logs/agent_calls.jsonl</code> and <code>logs/pipeline_events.jsonl</code>.</p>
 <p><strong>Step 1: upload the room.</strong> Theia corrects the EXIF orientation, reads the lens focal length when present, and caches the photo at full resolution on the server.</p>
 <figure><div class="shot-missing">Screenshot <strong>room-upload</strong> goes here: Room photo uploaded; the note confirms orientation correction and that the photo is saved for this session.<br><small>Save it as docs/screenshots/room-upload.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T16:37:57.952382+00:00&quot;, &quot;stage&quot;: &quot;room_upload&quot;, &quot;angles&quot;: 1, &quot;stitched&quot;: false, &quot;exif_focal_35mm&quot;: null}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T20:26:58.958851+00:00&quot;, &quot;stage&quot;: &quot;room_upload&quot;, &quot;angles&quot;: 1, &quot;stitched&quot;: false, &quot;exif_focal_35mm&quot;: null}</code></pre>
 <p><strong>Step 2: optionally click four floor corners.</strong> These define the floor rectangle, from which Theia recovers the camera's height, tilt, roll and (without EXIF) focal length.</p>
 <figure><div class="shot-missing">Screenshot <strong>floor-corners</strong> goes here: The four labelled floor points (near-left, near-right, far-right, far-left) clicked on the room photo.<br><small>Save it as docs/screenshots/floor-corners.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T17:28:17.795959+00:00&quot;, &quot;stage&quot;: &quot;room_scene&quot;, &quot;layout_source&quot;: &quot;clicked floor corners + tilt from 9 vertical edges&quot;, &quot;focal_source&quot;: &quot;floor-corner vanishing points&quot;, &quot;camera_height_m&quot;: 1.45, &quot;pitch_deg&quot;: 0.43, &quot;roll_deg&quot;: 0.01, &quot;confidence&quot;: &quot;good&quot;, &quot;depth&quot;: false}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T20:46:42.435655+00:00&quot;, &quot;stage&quot;: &quot;room_scene&quot;, &quot;layout_source&quot;: &quot;clicked floor corners + roll from 9 vertical edges&quot;, &quot;focal_source&quot;: &quot;floor-corner vanishing points&quot;, &quot;camera_height_m&quot;: 1.45, &quot;pitch_deg&quot;: -4.41, &quot;roll_deg&quot;: 0.01, &quot;confidence&quot;: &quot;good&quot;, &quot;depth&quot;: false}</code></pre>
 <p><strong>Step 3: paste the Marketplace URL.</strong> The parser extracts the title, gallery and seller dimensions (24" W, 24.5" H, seat 18"). The agent is called once and returns only a category, pose and warnings.</p>
 <figure><div class="shot-missing">Screenshot <strong>add-listing</strong> goes here: Item added: seller-stated dimensions, the agent&#x27;s category, and the cutout method are shown in the note.<br><small>Save it as docs/screenshots/add-listing.png and run python docs/build_docs.py</small></div></figure>
-<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T17:28:39.026011+00:00&quot;, &quot;status&quot;: &quot;success&quot;, &quot;model&quot;: &quot;gpt-6-luna&quot;, &quot;input_tokens&quot;: 625, &quot;cached_input_tokens&quot;: 0, &quot;output_tokens&quot;: 72, &quot;result&quot;: {&quot;category&quot;: &quot;bench&quot;, &quot;pose&quot;: &quot;upright&quot;, &quot;flags&quot;: [&quot;Description contains unrelated webpage markup.&quot;], &quot;source&quot;: &quot;gpt-6-luna&quot;}}</code></pre>
+<pre><code>{&quot;timestamp&quot;: &quot;2026-10-26T20:47:00.923138+00:00&quot;, &quot;status&quot;: &quot;success&quot;, &quot;model&quot;: &quot;gpt-6-luna&quot;, &quot;input_tokens&quot;: 603, &quot;cached_input_tokens&quot;: 0, &quot;output_tokens&quot;: 149, &quot;result&quot;: {&quot;category&quot;: &quot;table&quot;, &quot;pose&quot;: &quot;upright&quot;, &quot;flags&quot;: [&quot;Description contains corrupted webpage text.&quot;], &quot;source&quot;: &quot;gpt-6-luna&quot;}}</code></pre>
 <p><strong>Step 4: cutout.</strong> Each gallery photo is cut out. The main photo is the "front" view, and the others can be tagged as left, right or back.</p>
 <figure><div class="shot-missing">Screenshot <strong>item-card</strong> goes here: Item card: switch between the cutout and the untouched seller photo, and tag which side each listing photo shows.<br><small>Save it as docs/screenshots/item-card.png and run python docs/build_docs.py</small></div></figure>
 <p><strong>Step 4b: heart the item.</strong> The seller-message agent drafts a short, natural first message. The user can edit it, try another wording, copy it, and open the listing to send it in Messenger.</p>
@@ -276,7 +276,7 @@ python app.py                 # open http://127.0.0.1:8050
 pip install "rembg[cpu]" onnxruntime && python scripts/download_models.py</code></pre>
 <p>The app runs without a key (deterministic classification) and without the optional models (GrabCut cutouts, flat room box).</p>
 <h3>Automated test output</h3>
-<pre><code># Test run Mon Oct 26 16:13:15 EDT 2026
+<pre><code># Test run Mon Oct 26 16:48:46 EDT 2026
 
 $ python tests/test_geometry.py
 (1.45, -12, 0, 0) height 1.45 pitch -12.0 roll 0.0 clicked floor corners EXIF 35 mm focal length
@@ -313,7 +313,13 @@ overspending tests passed
 seller message tests passed
 </code></pre>
 <h3>Engineering log (git history)</h3>
-<pre><code>2026-10-26 13:34  3D: single walk-through camera (look, walk, reset) replaces photo/orbit/top; items always start in view; roll from vertical edges with plausibility check
+<pre><code>2026-10-26 16:39  Fix: &#x27;mat&#x27; substring laid furniture flat; keep 2D items inside preview; robust scene items + server log capture; more diagnostics
+2026-10-26 16:35  Browser diagnostics: JS errors + image-free layout snapshots logged to logs/client_diagnostics.jsonl
+2026-10-26 16:31  3D: new items start centred and inside the photo&#x27;s field of view; reset stale saved placements
+2026-10-26 16:24  Up to 15 items per room, saved on the device (local storage); 2D positions persist across adds; 15-item limit prompt; 7-day media retention
+2026-10-26 16:20  Rotation slider turns the item (2D rotateY + instant DOM update; 3D card follows yaw up to 75deg); heart never fails silently
+2026-10-26 16:13  Heart an item: seller-message agent drafts an editable 2-4 sentence enquiry (validated, template fallback, never sends); tests + docs
+2026-10-26 13:34  3D: single walk-through camera (look, walk, reset) replaces photo/orbit/top; items always start in view; roll from vertical edges with plausibility check
 2026-10-26 13:23  Cutouts: model-guided GrabCut recovers ghosted upholstery, keeps see-through wall transparent; real-listing before/after figure
 2026-10-26 13:06  Marker tag text: ASCII separator
 2026-10-26 13:05  Floor-corner markers: precise crosshair dots, compact numbered tags, live floor outline

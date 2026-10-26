@@ -40,3 +40,16 @@
 {"timestamp": "2026-10-26T20:36:54.448006+00:00", "stage": "cutout", "ok": false, "error": "ValueError"}
 {"timestamp": "2026-10-26T20:37:49.584952+00:00", "stage": "cutout", "width": 600, "height": 904, "method": "u2net segmentation + colour-guided repair", "background_pockets_cleared_px": 0, "pattern_holes_filled": 0, "recovered_px": 314, "removed_px": 2028, "holes_restored": 0, "holes_cleared": 0, "specks_removed": 0, "coverage": 0.144, "edge_contact": 0.0, "ok": true, "aspect": 1.2571}
 {"timestamp": "2026-10-26T20:37:49.949606+00:00", "stage": "cutout", "ok": false, "error": "ValueError"}
+{"timestamp": "2026-10-26T20:46:10.794382+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -3.96, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:46:10.798617+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:46:10.817035+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
+{"timestamp": "2026-10-26T20:46:10.817287+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:46:10.826429+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
+{"timestamp": "2026-10-26T20:46:10.826602+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:46:42.435655+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -4.41, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:46:42.436017+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:46:48.486513+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:46:57.111975+00:00", "stage": "cutout", "width": 600, "height": 800, "method": "u2net segmentation + colour-guided repair", "background_pockets_cleared_px": 0, "pattern_holes_filled": 3, "recovered_px": 871, "removed_px": 957, "holes_restored": 2, "holes_cleared": 5, "specks_removed": 0, "coverage": 0.219, "edge_contact": 0.0, "ok": true, "aspect": 0.9947}
+{"timestamp": "2026-10-26T20:46:57.536663+00:00", "stage": "cutout", "ok": false, "error": "ValueError"}
+{"timestamp": "2026-10-26T20:47:00.938465+00:00", "stage": "scene_items", "library": 1, "in_scene": 1}
+{"timestamp": "2026-10-26T20:47:00.981681+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}

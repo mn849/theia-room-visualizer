@@ -355,3 +355,86 @@ def make_cutout(image: Image.Image) -> tuple[Image.Image, dict]:
         cutout = cutout.crop((max(0, bbox[0] - pad), max(0, bbox[1] - pad), min(w, bbox[2] + pad), min(h, bbox[3] + pad)))
     report["aspect"] = round(cutout.width / max(1, cutout.height), 4)
     return cutout, report
+
+
+QUANTITY_WORDS = {"pair": 2, "two": 2, "both": 2, "three": 3, "four": 4, "twin": 2}
+
+
+def listing_quantity(title: str, description: str = "") -> int:
+    """How many pieces the seller says the listing contains (1 if unclear)."""
+    text = f"{title} {description[:400]}".lower()
+    import re
+    match = re.search(r"\b(?:set of|x|qty:?|quantity:?|lot of)\s*(\d)\b|\b(\d)\s*(?:x\b|pcs\b|pieces\b|matching\b|chairs\b|stools\b|tables\b|nightstands\b|lamps\b|bedside)", text)
+    if match:
+        value = int(match.group(1) or match.group(2))
+        return value if 2 <= value <= 6 else 1
+    for word, value in QUANTITY_WORDS.items():
+        if re.search(rf"\b{word}\b", text) and re.search(r"\b(chairs|stools|tables|nightstands|bedside|lamps|side tables|armchairs|pieces|set|matching)\b", text):
+            return value
+    return 1
+
+
+def split_pieces(cutout: Image.Image, expected: int = 1) -> list[Image.Image]:
+    """Split a cutout that shows several separate objects into one image each.
+
+    Uses the cutout's own alpha: separate objects are separate connected
+    regions. If the seller says there are N pieces but they touch in the photo,
+    fall back to cutting at the emptiest vertical gaps. Returns [] when the
+    photo should stay a single item.
+    """
+    if cv2 is None:
+        return []
+    rgba = np.asarray(cutout.convert("RGBA"))
+    alpha = rgba[:, :, 3]
+    solid = (alpha > 96).astype(np.uint8)
+    # Close hairline gaps so one chair's legs don't become separate "pieces".
+    kernel = np.ones((max(3, alpha.shape[0] // 60), max(3, alpha.shape[1] // 120)), np.uint8)
+    joined = cv2.morphologyEx(solid, cv2.MORPH_CLOSE, kernel)
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(joined, connectivity=8)
+    comps = sorted(range(1, count), key=lambda i: -stats[i, cv2.CC_STAT_AREA])
+    if comps:
+        largest = stats[comps[0], cv2.CC_STAT_AREA]
+        share = 0.3 if expected >= 2 else 0.5  # stricter when the seller didn't say it's a set
+        big = [i for i in comps if stats[i, cv2.CC_STAT_AREA] >= share * largest][:6]
+    else:
+        big = []
+    boxes = []
+    if len(big) >= 2 and (expected == 1 and len(big) <= 4 or expected >= 2):
+        for i in sorted(big, key=lambda i: stats[i, cv2.CC_STAT_LEFT]):
+            x, y, w, h = (int(v) for v in stats[i, :4])
+            mask = (labels == i)
+            # Include faint edge pixels near this component.
+            near = cv2.dilate(mask.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+            boxes.append(((x, y, w, h), near))
+    elif expected >= 2:
+        # Pieces touch: cut at the (expected-1) emptiest columns between them.
+        column = solid.sum(axis=0).astype(np.float32)
+        width = len(column)
+        cuts = []
+        for k in range(1, expected):
+            centre = int(width * k / expected)
+            lo, hi = max(1, centre - width // (expected * 3)), min(width - 1, centre + width // (expected * 3))
+            if hi <= lo:
+                return []
+            cut = lo + int(np.argmin(column[lo:hi]))
+            if column[cut] > 0.35 * column.max():
+                return []  # no clear gap: keep as one item rather than slicing an object
+            cuts.append(cut)
+        edges = [0] + cuts + [width]
+        for a, b in zip(edges[:-1], edges[1:]):
+            mask = np.zeros_like(solid, dtype=bool)
+            mask[:, a:b] = True
+            ys, xs = np.nonzero(solid[:, a:b])
+            if len(xs) == 0:
+                return []
+            boxes.append(((a + int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)), mask))
+    if len(boxes) < 2:
+        return []
+    pieces = []
+    for (x, y, w, h), mask in boxes:
+        piece = rgba.copy()
+        piece[:, :, 3] = np.where(mask, piece[:, :, 3], 0)
+        pad = 4
+        crop = Image.fromarray(piece, "RGBA").crop((max(0, x - pad), max(0, y - pad), min(rgba.shape[1], x + w + pad), min(rgba.shape[0], y + h + pad)))
+        pieces.append(crop)
+    return pieces

@@ -59,7 +59,10 @@ def _template(item: dict, seed: int = 0) -> str:
     facts = _facts(item)
     rng = random.Random(f"{item.get('id', '')}-{seed}")
     name = facts["title"]
-    opener = rng.choice([f"Hi! Is the {name} still available?", f"Hi there, is your {name} still available?", f"Hey, I really like the {name}. Is it still available?"])
+    if item.get("group") or re.search(r"\b(pair|set|two|chairs|stools|tables|nightstands)\b", name):
+        opener = rng.choice([f"Hi! Is the {name} still available?", f"Hi there, are the {name} still available?", f"Hey, I really like the {name}. Are they still available?"])
+    else:
+        opener = rng.choice([f"Hi! Is the {name} still available?", f"Hi there, is your {name} still available?", f"Hey, I really like the {name}. Is it still available?"])
     if facts["missing"]:
         ask = rng.choice([f"Could you let me know {facts['missing'][0]}, just so I can check it'll fit my space?", f"Would you mind sending {facts['missing'][0]}? I want to make sure it fits in my room."])
     else:
