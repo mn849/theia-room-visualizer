@@ -93,6 +93,14 @@
       overlay.addEventListener('pointerdown', function (event) {
         event.preventDefault();
         overlay.setPointerCapture(event.pointerId);
+        // Clicking an item makes it the one the Orientation controls
+        // (pose, rotation slider, Love it) act on.
+        stage.querySelectorAll('.item-overlay.selected').forEach(function (o) { o.classList.remove('selected'); });
+        overlay.classList.add('selected');
+        try {
+          const id = JSON.parse(overlay.id).index;
+          if (window.dash_clientside && window.dash_clientside.set_props) window.dash_clientside.set_props('item-select', { value: id });
+        } catch (e) { /* ignore */ }
         const stageBox = stage.getBoundingClientRect();
         const overlayBox = overlay.getBoundingClientRect();
         startX = event.clientX; startY = event.clientY;

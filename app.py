@@ -792,6 +792,17 @@ def update_scene(room, calibration, items=None):
 
 
 app.clientside_callback(
+    """function(selected) {
+        document.querySelectorAll('.item-overlay').forEach(function (o) {
+            let id = null; try { id = JSON.parse(o.id).index; } catch (e) {}
+            o.classList.toggle('selected', !!selected && id === selected);
+        });
+        return window.dash_clientside.no_update;
+    }""",
+    Output("positions-sink", "data", allow_duplicate=True), Input("item-select", "value"), prevent_initial_call=True,
+)
+
+app.clientside_callback(
     "function(data) { window.__theiaPositions = data || {}; return window.dash_clientside.no_update; }",
     Output("positions-sink", "data"), Input("overlay-positions", "data"),
 )

@@ -73,3 +73,4 @@ body{background:var(--paper);font-family:'DM Sans',Arial,sans-serif;color:var(--
 .history-row{display:grid;grid-template-columns:46px 1fr auto;gap:10px;align-items:center;font-size:11px}.history-thumb{width:46px;height:46px;object-fit:contain;background:#f1eee6}
 .history-copy{display:flex;flex-direction:column;gap:2px;min-width:0}.history-copy strong{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.history-copy small{color:var(--muted)}
 .item-overlay[data-width-m] .item-image{max-height:none}
+.item-overlay.selected .item-image{outline:2px dashed rgba(30,90,76,.85);outline-offset:3px}

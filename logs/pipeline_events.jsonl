@@ -87,3 +87,5 @@
 {"timestamp": "2026-10-26T20:55:53.230047+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -3.87, "roll_deg": 0.01, "confidence": "good", "depth": false}
 {"timestamp": "2026-10-26T20:56:06.492335+00:00", "stage": "heart", "hearted": true, "source": "gpt-6-luna"}
 {"timestamp": "2026-10-26T20:56:07.073195+00:00", "stage": "heart", "hearted": true, "source": "gpt-6-luna"}
+{"timestamp": "2026-10-26T20:59:25.077789+00:00", "stage": "cutout", "width": 600, "height": 800, "method": "u2net segmentation + colour-guided repair", "background_pockets_cleared_px": 0, "pattern_holes_filled": 16, "recovered_px": 3275, "removed_px": 951, "holes_restored": 0, "holes_cleared": 1, "specks_removed": 1, "coverage": 0.214, "edge_contact": 0.005, "ok": true, "aspect": 0.4583}
+{"timestamp": "2026-10-26T20:59:25.421699+00:00", "stage": "cutout", "ok": false, "error": "ValueError"}
