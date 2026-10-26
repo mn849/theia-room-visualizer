@@ -134,12 +134,28 @@ def parse_metadata(url: str) -> tuple[str, str | None, str, str, list[str]]:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("Enter a complete http(s) listing URL.")
-    # A normal desktop-browser request: Facebook only includes the full listing
-    # data (including the seller's whole description) in pages it serves to
-    # browsers. Public listings only; Theia never logs in.
-    response = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36", "Accept-Language": "en-US,en;q=0.9"})
-    response.raise_for_status()
-    source = response.text[:2_000_000]
+    # Facebook answers different clients differently: the simple request that
+    # Theia has always used returns the public preview tags, a browser-style
+    # request can also include the seller's full description, and either may be
+    # refused (e.g. 400). Try both and read everything that comes back. Public
+    # listings only; Theia never logs in. Tracking parameters are dropped.
+    clean_url = url.split("?", 1)[0] if parsed.netloc.lower().endswith("facebook.com") else url
+    attempts = [
+        {"User-Agent": "Theia/0.1"},
+        {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36", "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"},
+        {"User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"},
+    ]
+    pages, last_error = [], None
+    for headers in attempts:
+        try:
+            response = requests.get(clean_url, timeout=10, headers=headers)
+            response.raise_for_status()
+            pages.append(response.text[:2_000_000])
+        except Exception as exc:  # keep trying the other request styles
+            last_error = exc
+    if not pages:
+        raise last_error or ValueError("listing page unavailable")
+    source = "\n".join(pages)
 
     def meta(property_name: str) -> str | None:
         # Publishers put content before property/name as often as after it.
