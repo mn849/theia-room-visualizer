@@ -37,3 +37,14 @@ body{background:var(--paper);font-family:'DM Sans',Arial,sans-serif;color:var(--
 .corner-inputs{display:none}
 .floor-marker{white-space:nowrap;width:auto;min-width:76px;padding:0 8px}
 .floor-marker{margin:0;transform:translate(-50%,-50%)}
+/* 3D room viewer */
+.preview-wrap{position:relative}.scene3d{display:none;width:100%}.preview-wrap.is-3d #stage{display:none}
+.scene3d-frame{position:relative;margin:0 auto;background:#ebe9e1;overflow:hidden;touch-action:none}.scene3d-frame canvas{display:block;width:100%;height:100%}
+.scene3d-toolbar{position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:3}.scene3d-btn{border:1px solid rgba(23,33,31,.18);background:rgba(251,250,246,.92);color:var(--ink);font:500 10px 'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase;padding:8px 10px;cursor:pointer}.scene3d-btn:hover{background:#fff}.scene3d-btn.active{background:var(--green);border-color:var(--green);color:#fff}
+.scene3d-badge{position:absolute;left:12px;bottom:12px;max-width:75%;background:rgba(23,33,31,.72);color:#fff;font:500 9.5px 'DM Mono',monospace;letter-spacing:.04em;padding:6px 8px;z-index:3;pointer-events:none}
+.scene3d-notice{display:none;position:absolute;left:12px;top:12px;max-width:60%;background:#fff4e8;border:1px solid #e3b48f;color:#6b3f1f;font-size:11px;padding:7px 9px;z-index:3;pointer-events:none}
+.scene3d-help{font-size:10.5px;color:var(--muted);line-height:1.5;padding:9px 2px 0}.scene3d-failed{padding:16px;font-size:12px;color:var(--muted)}
+.scene-notes{font-size:11px;line-height:1.55;color:var(--muted);padding:8px 2px 0}.scene-notes strong{color:var(--ink)}
+.item-card-head{display:flex;gap:12px;align-items:flex-start}.item-card-image{width:74px;height:74px;object-fit:contain;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/12px 12px;flex:none}.item-card-copy{display:flex;flex-direction:column;gap:4px}.cutout-method{opacity:.8}
+.display-toggle{font-size:11px;margin:8px 0 2px}.display-toggle label{margin-right:14px;cursor:pointer}.display-toggle input{margin-right:5px}
+.view-details{font-size:11px;margin-top:6px}.view-details summary{cursor:pointer;color:var(--green);font-weight:600}.view-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:8px}.view-tile{display:flex;flex-direction:column;gap:5px}.view-thumb{width:100%;height:90px;object-fit:contain;background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/12px 12px}.view-select{font-size:11px}
