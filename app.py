@@ -134,7 +134,10 @@ def parse_metadata(url: str) -> tuple[str, str | None, str, str, list[str]]:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("Enter a complete http(s) listing URL.")
-    response = requests.get(url, timeout=8, headers={"User-Agent": "Theia/0.1"})
+    # A normal desktop-browser request: Facebook only includes the full listing
+    # data (including the seller's whole description) in pages it serves to
+    # browsers. Public listings only; Theia never logs in.
+    response = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36", "Accept-Language": "en-US,en;q=0.9"})
     response.raise_for_status()
     source = response.text[:2_000_000]
 
@@ -165,13 +168,23 @@ def parse_metadata(url: str) -> tuple[str, str | None, str, str, list[str]]:
     if is_facebook:
         # Marketplace often puts the seller's details in escaped bootstrap JSON
         # instead of a normal description meta tag.
-        for key in ("description", "listing_description", "item_description", "body"):
-            matches = re.findall(rf'"{key}"\s*:\s*"((?:\\.|[^"\\]){{20,2000}})"', source, flags=re.I)
-            if matches:
-                candidate = bytes(matches[0], "utf-8").decode("unicode_escape", errors="ignore")
-                if len(candidate) > len(description):
-                    description = candidate
-                    break
+        # Read the seller's COMPLETE description from the page data. Marketplace
+        # stores it as {"redacted_description":{"text":"..."}} (older pages:
+        # "description"/"listing_description"); the og:description meta tag is
+        # usually cut off before the measurements.
+        full_texts = []
+        for pattern in (r'"redacted_description"\s*:\s*\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"',
+                        r'"(?:description|listing_description|item_description)"\s*:\s*\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"',
+                        r'"(?:description|listing_description|item_description)"\s*:\s*"((?:\\.|[^"\\]){20,6000})"'):
+            for raw in re.findall(pattern, source):
+                try:
+                    full_texts.append(json.loads(f'"{raw}"'))
+                except ValueError:
+                    continue
+        if full_texts:
+            longest = max(full_texts, key=len)
+            if len(longest) > len(description):
+                description = longest
         visible_text = re.sub(r"<[^>]+>", " ", source)
         visible_text = re.sub(r"\\[\"']", "", html_lib.unescape(visible_text))
         dimension_snippets = re.findall(r"[^<>{}]{0,80}(?:dimensions?|measurements?|width|height|depth)[^<>{}]{0,180}", visible_text, flags=re.I)
@@ -488,7 +501,6 @@ app.layout = html.Div([
                 html.Div(id="room-library", className="room-library"),
                 dcc.Input(id="listing-url", type="url", placeholder="Paste a Facebook Marketplace listing URL", className="text-input"),
                 dcc.Input(id="image-url", type="url", placeholder="Optional direct item-image URL", className="text-input"),
-                dcc.Textarea(id="listing-text", placeholder="Optional: paste the listing description here (Theia reads the measurements from it, e.g. 20.5\"W x 15\"D x 28\"H)", className="text-input listing-text", rows=3),
                 dcc.Upload(id="item-upload", children=html.Div([html.Strong("Or upload a listing screenshot"), html.Span("PNG or JPG", className="upload-help")], className="compact-upload"), className="compact-upload-zone"),
                 html.Button("Add item to room", id="add-item", className="primary-button"), dcc.Loading(html.Div(id="item-note", className="file-note"), type="dot", color="#1e5a4c"),
                 html.Details([html.Summary(id="history-summary", children="History of items you've tried"), html.Div(id="history-list", className="history-list")], className="history-panel", open=True),
@@ -609,22 +621,22 @@ def calibrate_room(_, measurement_type, measurement, unit, calibration):
     return {"dimensions_m": dimensions, "source": f"user-confirmed {labels.get(measurement_type, 'room')}", "confirmed": confirmed}, f"Room {labels.get(measurement_type)} set to {metres:.2f} m.{hint}"
 
 
-@app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Output("item-history", "data"), Output("listing-url", "value"), Output("image-url", "value"), Output("item-upload", "contents"), Output("listing-text", "value"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), State("item-history", "data"), State("listing-text", "value"), prevent_initial_call=True)
-def add_item(_, listing_url, image_url, upload_contents, library, history, pasted_text=None):
+@app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Output("item-history", "data"), Output("listing-url", "value"), Output("image-url", "value"), Output("item-upload", "contents"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), State("item-history", "data"), prevent_initial_call=True)
+def add_item(_, listing_url, image_url, upload_contents, library, history):
     """Add a listing to the room, keeping every item already there.
 
     Returns (library, note, history, cleared URL, cleared image URL, cleared
     upload) so a previous screenshot can never be reused for the next link.
     """
-    result = _add_item(listing_url, image_url, upload_contents, library, pasted_text)
+    result = _add_item(listing_url, image_url, upload_contents, library)
     new_library, note = result
     if new_library is no_update:
-        return no_update, note, no_update, no_update, no_update, no_update, no_update
+        return no_update, note, no_update, no_update, no_update, no_update
     added = [item for item in new_library if item["id"] not in {old["id"] for old in library or []}]
     history = list(history or [])
     known = {entry["id"] for entry in history}
     history = [{"id": item["id"], "added_at": datetime.now(timezone.utc).isoformat(), "item": item} for item in added if item["id"] not in known] + history
-    return new_library, note, history[:60], "", "", None, ""
+    return new_library, note, history[:60], "", "", None
 
 
 def _add_item(listing_url, image_url, upload_contents, library, pasted_text=None):
