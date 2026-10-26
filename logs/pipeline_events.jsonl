@@ -82,3 +82,8 @@
 {"timestamp": "2026-10-26T20:51:46.011908+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
 {"timestamp": "2026-10-26T20:51:46.016803+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
 {"timestamp": "2026-10-26T20:51:46.023764+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:55:21.663184+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -3.85, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:55:21.693920+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
+{"timestamp": "2026-10-26T20:55:53.230047+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -3.87, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:56:06.492335+00:00", "stage": "heart", "hearted": true, "source": "gpt-6-luna"}
+{"timestamp": "2026-10-26T20:56:07.073195+00:00", "stage": "heart", "hearted": true, "source": "gpt-6-luna"}

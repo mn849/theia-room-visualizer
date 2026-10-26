@@ -19,6 +19,7 @@ from listing_agent import analyze_listing
 import item_cutout
 import media_store
 import room_geometry
+import measurements
 from message_agent import draft_seller_message
 import depth_model
 
@@ -79,7 +80,7 @@ def empty_stage():
     ], className="empty-preview")
 
 
-def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[float]] | None = None, positions: dict | None = None):
+def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[float]] | None = None, positions: dict | None = None, camera: dict | None = None):
     if not room_src:
         return empty_stage()
     children = [html.Img(src=room_src, className="room-image")]
@@ -100,11 +101,17 @@ def room_stage(room_src: str | None, items: list[dict], floor_points: list[list[
             html.Img(src=item["src"], className="item-image"), html.Span("Drag me", className="drag-hint")
         ], id={"type": "item-overlay", "index": item["id"]}, className="item-overlay", draggable="false", **{
             "data-base-width": f"{item.get('visual_scale', 0.22) * 100:.3f}",
+            "data-width-m": f"{float(item.get('dimensions', {}).get('width_m') or 0):.4f}",
+            "data-row": str(index // 5),
+            "data-default": "0" if saved else "1",
             "style": {"width": f"{item.get('visual_scale', 0.22) * 100:.1f}%", "left": left, "top": top, "transform": transform}
         }))
     stage_props = {"id": "room-stage", "className": "room-stage"}
     if floor_points and len(floor_points) == 4:
         stage_props["data-floor-points"] = json.dumps(floor_points)
+    if camera:
+        # Lets the 2D view size items in true metres for where they stand.
+        stage_props["data-camera"] = json.dumps({k: camera[k] for k in ("position", "basis", "focal_px", "width", "height")})
     return html.Div(children, **stage_props)
 
 
@@ -630,8 +637,10 @@ def _add_item(listing_url, image_url, upload_contents, library):
     gallery[0]["view"] = "front"
     hero = gallery[0]
     note = f"{note} · {len(gallery)} listing photo(s) cached at full resolution · {hero['method']}" + ("" if hero["cutout_ok"] else " · cutout unreliable, showing the untouched photo")
-    dimensions, dimension_source, dimension_confidence = infer_item_dimensions(title, description)
     agent_result = analyze_listing(title, description)
+    # Seller text first; a single stated measurement is completed from the
+    # item's own photo proportions (see measurements.py).
+    dimensions, dimension_source, dimension_confidence = measurements.infer_dimensions(title, description, hero.get("aspect") if hero.get("cutout_ok") else hero.get("photo_aspect"), agent_result.get("category"))
     room_prior_m = 4.0
     visual_scale = max(0.08, min(0.72, dimensions.get("width_m", 1.0) / room_prior_m))
     # Whole words only: "mat" used to match "material", "format", "automatic",
@@ -660,12 +669,16 @@ def _add_item(listing_url, image_url, upload_contents, library):
                 url = media_store.save_image(piece, "PNG")
                 aspect = round(piece.width / max(1, piece.height), 4)
                 view = {**hero, "cutout": url, "aspect": aspect, "view": "front"}
-                new_items.append({**base_item, "id": f"{group}-{k}", "group": group, "src": url, "gallery": [view], "title": f"{title} ({k} of {len(pieces)})", "display": "cutout"})
+                # Seller sizes in a "pair" listing describe ONE piece; any
+                # deduced size must use this piece's own photo, not the pair's.
+                piece_dims, piece_source, piece_conf = measurements.infer_dimensions(title, description, aspect, agent_result.get("category"))
+                new_items.append({**base_item, "id": f"{group}-{k}", "group": group, "src": url, "gallery": [view], "title": f"{title} ({k} of {len(pieces)})", "display": "cutout", "dimensions": piece_dims, "dimension_source": piece_source, "dimension_confidence": piece_conf})
             log_pipeline({"stage": "split_listing", "pieces": len(pieces), "seller_quantity": expected})
     if len(library or []) + len(new_items) > MAX_ITEMS:
         return no_update, f"This listing has {len(new_items)} pieces but only {MAX_ITEMS - len(library or [])} of {MAX_ITEMS} spaces are free. Remove some items first."
     updated = new_items + (library or [])
     item = new_items[0]
+    dimensions, dimension_source = item["dimensions"], item["dimension_source"]
     split_note = f" Split into {len(new_items)} separate pieces you can move individually." if len(new_items) > 1 else ""
     return updated[:MAX_ITEMS], f"Added {title}{split_note} ({len(updated)} of {MAX_ITEMS} items in this room). Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
 
@@ -961,7 +974,13 @@ def render_preview(room, items, calibration, selected, positions):
     options = [{"label": item.get("title", "Untitled item"), "value": item["id"]} for item in items]
     ids = [item["id"] for item in items]
     value = selected if selected in ids else (ids[0] if ids else None)
-    return room_stage(room_src, items, (room or {}).get("floor_points"), positions), details, [
+    camera = None
+    if room_src:
+        try:
+            camera = build_room_scene(room, calibration)["scene"]["camera"]
+        except Exception:
+            camera = None
+    return room_stage(room_src, items, (room or {}).get("floor_points"), positions, camera), details, [
         metric("ROOM", "Ready" if room_src else "Not added", (room or {}).get("correction", "Upload room angles")),
         metric("ITEMS", str(len(items)), "Placed together" if items else "Add a listing"), metric("SCALE", "Automatic" if items else "Waiting", f"{(calibration or {}).get('source', 'default reference')} · {room_width_m:.2f} m width · {room_dimensions['height_m']:.2f} m height"),
     ], library_view, options, value

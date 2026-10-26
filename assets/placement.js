@@ -4,7 +4,58 @@
     if (!stage) return;
     let floor = null;
     try { floor = JSON.parse(stage.dataset.floorPoints || 'null'); } catch (e) { floor = null; }
+    let camera = null;
+    try { camera = JSON.parse(stage.dataset.camera || 'null'); } catch (e) { camera = null; }
+    const roomImg = stage.querySelector('.room-image');
+
+    // Map a point in the preview to the photo, cast a ray from the recovered
+    // camera and hit the floor. Returns the distance along the camera's
+    // viewing axis (metres) and the photo-to-preview scale.
+    function floorDepthAt(px, py) {
+      if (!camera || !roomImg || !roomImg.naturalWidth) return null;
+      const box = stage.getBoundingClientRect();
+      const iw = camera.width, ih = camera.height;
+      const s = Math.max(box.width / iw, box.height / ih);  // object-fit: cover
+      const ox = (box.width - iw * s) / 2, oy = (box.height - ih * s) / 2;
+      const uc = (px - ox) / s - iw / 2, vc = (py - oy) / s - ih / 2;
+      const f = camera.focal_px, b = camera.basis;
+      const d = [uc / f, -vc / f, -1];
+      const dir = [0, 1, 2].map(function (k) { return b.x[k] * d[0] + b.y[k] * d[1] + b.z[k] * d[2]; });
+      if (dir[1] >= -1e-4) return { depth: Infinity, scale: s };
+      return { depth: -camera.position[1] / dir[1], scale: s };
+    }
+
+    function applyMetricScale(overlay) {
+      const widthM = Number(overlay.dataset.widthM);
+      if (!camera || !widthM || !roomImg || !roomImg.naturalWidth) return false;
+      const box = stage.getBoundingClientRect();
+      if (!box.width || !box.height) return false;
+      const rect = overlay.getBoundingClientRect();
+      const cx = (rect.left + rect.right) / 2 - box.left;
+      let bottom = rect.bottom - box.top;
+      if (overlay.dataset.default === '1') {
+        // First placement: stand the item on the floor ~2.4 m in front of
+        // the camera (rows of five step back 0.9 m each).
+        const target = 2.4 + Number(overlay.dataset.row || 0) * 0.9;
+        for (let y = box.height - 2; y > 0; y -= 3) {
+          const hit = floorDepthAt(cx, y);
+          if (hit && hit.depth >= target) { bottom = y; break; }
+        }
+        overlay.dataset.default = '0';
+      }
+      const hit = floorDepthAt(cx, bottom);
+      if (!hit) return false;
+      const depth = Math.min(Math.max(hit.depth, 0.6), 25);
+      const widthPx = widthM * camera.focal_px / depth * hit.scale;
+      overlay.style.width = Math.max(1.5, widthPx / box.width * 100) + '%';
+      const h = overlay.offsetHeight;
+      const top = Math.max(0, Math.min(box.height - h, bottom - h));
+      overlay.style.top = (top / box.height * 100) + '%';
+      return true;
+    }
+
     function applyDepthScale(overlay) {
+      if (applyMetricScale(overlay)) return;
       const stageBox = stage.getBoundingClientRect();
       if (!stageBox.width || !stageBox.height) return;
       let farY = 0.18, nearY = 0.92;
@@ -33,6 +84,10 @@
     stage.querySelectorAll('.item-overlay').forEach(function (overlay) {
       if (overlay.dataset.wired === 'true') return;
       overlay.dataset.wired = 'true';
+      const itemImg = overlay.querySelector('img');
+      const rescale = function () { applyDepthScale(overlay); };
+      if (itemImg && !itemImg.complete) itemImg.addEventListener('load', rescale, { once: true });
+      if (roomImg && !roomImg.complete) roomImg.addEventListener('load', rescale, { once: true });
       applyDepthScale(overlay);
       let startX = 0, startY = 0, startLeft = 0, startTop = 0;
       overlay.addEventListener('pointerdown', function (event) {

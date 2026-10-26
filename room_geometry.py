@@ -185,7 +185,10 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
             denominator = H[2, 0] * H[2, 1]
             if abs(denominator) > 1e-12:
                 f2 = -(H[0, 0] * H[0, 1] + H[1, 0] * H[1, 1]) / denominator
-                if f2 > 0 and 0.35 * max(width, height) < math.sqrt(f2) < 3.0 * max(width, height):
+                # Only trust lens estimates in the range of real phone cameras (about
+                # 45-105 degrees across); sloppy clicks otherwise give a telephoto
+                # lens, which makes every item look gigantic.
+                if f2 > 0 and 0.4 * max(width, height) < math.sqrt(f2) < 1.25 * max(width, height):
                     focal, focal_source = math.sqrt(f2), "floor-corner vanishing points"
         if focal is None:
             focal, focal_source = focal_px_from_f35(DEFAULT_F35, width, height), "typical 26 mm phone lens (assumed)"
