@@ -48,6 +48,9 @@ def parse_stated(title: str, description: str) -> tuple[dict[str, float], list[f
     text = html.unescape(f"{title}\n{description}").lower().replace("×", "x")
     # Web-page noise ("width:100px", "height: 50%") is not a measurement.
     text = re.sub(r"\d+(?:\.\d+)?\s*(?:px|%|r?em|vh|vw|pt)\b", " ", text)
+    # Facebook timestamps ("Listed 1w ago", "3 d ago", "2 h ago") are not sizes;
+    # "1w ago" was being read as a 1-inch-wide table.
+    text = re.sub(r"\b\d+\s*(?:w|d|h|m|y|mo|min|mins|hr|hrs|wk|wks|weeks?|days?|hours?|months?|years?)\s+ago\b", " ", text)
     # Sizes found in the seller's own text take priority over everything else.
     seller = re.search(r"seller sizes:([^\n]*)", text)
     if seller:

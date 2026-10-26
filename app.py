@@ -745,6 +745,16 @@ def remove_item(_, items):
     return remaining, "Item removed from this session."
 
 
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Output("item-note", "children", allow_duplicate=True), Input({"type": "remove-group", "index": ALL}, "n_clicks"), State("item-library-data", "data"), prevent_initial_call=True)
+def remove_group(_, items):
+    """Remove every piece that came from one listing (e.g. both bedside tables)."""
+    if not ctx.triggered_id or not items or not ctx.triggered or not ctx.triggered[0].get("value"):
+        return no_update, no_update
+    group = ctx.triggered_id.get("index")
+    remaining = [item for item in items if item.get("group") != group and item.get("id") != group]
+    return remaining, f"Removed {len(items) - len(remaining)} piece(s) from the room."
+
+
 @app.callback(Output("item-library-data", "data", allow_duplicate=True), Input("item-rotation", "value"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
 def rotate_item(rotation, selected_id, items):
     """Rotation for the 2D preview (the 3D view keeps its own yaw in item-placements)."""
@@ -907,7 +917,10 @@ def item_card(item: dict):
         html.Div([html.Img(src=hero["cutout"] if item.get("display", "cutout") == "cutout" else hero["photo"], className="item-card-image"), html.Div([html.Strong(item.get("title", "Untitled item")), html.Small(f"{size} · {item.get('dimension_source', 'unscaled')}"), html.Small(f"Cutout: {hero.get('method', 'n/a')}", className="cutout-method")], className="item-card-copy")], className="item-card-head"),
         dcc.RadioItems(id={"type": "item-display", "index": item["id"]}, options=[{"label": "Cutout (background removed)", "value": "cutout"}, {"label": "Original seller photo", "value": "photo"}], value=item.get("display", "cutout"), inline=True, className="display-toggle"),
         html.Details([html.Summary(f"Listing photos & angles ({len(gallery)})"), html.Small("Tell Theia which side each photo shows; the 3D view switches to the real photo nearest your viewing angle.", className="control-note"), views], className="view-details"),
-        html.Button("Remove", id={"type": "remove-item", "index": item["id"]}, className="remove-item", n_clicks=0),
+        html.Div([
+            html.Button("Remove this piece" if item.get("group") else "Remove from room", id={"type": "remove-item", "index": item["id"]}, className="remove-item", n_clicks=0),
+            html.Button("Remove whole listing", id={"type": "remove-group", "index": item["group"]}, className="remove-item", n_clicks=0) if item.get("group") else None,
+        ], className="seller-actions"),
     ], className="item-card" + (" is-hearted" if item.get("hearted") else ""))
 
 
