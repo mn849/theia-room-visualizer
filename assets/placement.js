@@ -43,14 +43,24 @@
         }
         overlay.dataset.default = '0';
       }
-      const hit = floorDepthAt(cx, bottom);
+      // The item's feet (bottom edge) are its position on the floor. Keep the
+      // feet inside the photo and size the item for the floor distance there.
+      // (Previously the top edge was clamped instead, which pinned big items
+      // to the bottom of the photo, i.e. right in front of the camera, so
+      // they stayed huge however far back you dragged them.)
+      bottom = Math.min(Math.max(bottom, 4), box.height);
+      let hit = floorDepthAt(cx, bottom);
       if (!hit) return false;
+      if (!isFinite(hit.depth)) {
+        // Feet above the horizon: slide them down to the farthest floor point.
+        for (let y = bottom; y < box.height; y += 3) { const h2 = floorDepthAt(cx, y); if (h2 && isFinite(h2.depth) && h2.depth < 25) { bottom = y; hit = h2; break; } }
+      }
       const depth = Math.min(Math.max(hit.depth, 0.6), 25);
       const widthPx = widthM * camera.focal_px / depth * hit.scale;
       overlay.style.width = Math.max(1.5, widthPx / box.width * 100) + '%';
       const h = overlay.offsetHeight;
-      const top = Math.max(0, Math.min(box.height - h, bottom - h));
-      overlay.style.top = (top / box.height * 100) + '%';
+      overlay.style.top = ((bottom - h) / box.height * 100) + '%';
+      overlay.dataset.depthM = depth.toFixed(2);
       return true;
     }
 
@@ -110,7 +120,7 @@
         if (!overlay.hasPointerCapture(event.pointerId)) return;
         const stageBox = stage.getBoundingClientRect();
         const x = Math.max(0, Math.min(stageBox.width - overlay.offsetWidth, startLeft + event.clientX - startX));
-        const y = Math.max(0, Math.min(stageBox.height - overlay.offsetHeight, startTop + event.clientY - startY));
+        const y = camera ? Math.min(stageBox.height - overlay.offsetHeight, startTop + event.clientY - startY) : Math.max(0, Math.min(stageBox.height - overlay.offsetHeight, startTop + event.clientY - startY));
         overlay.style.left = (x / stageBox.width * 100) + '%';
         overlay.style.top = (y / stageBox.height * 100) + '%';
         applyDepthScale(overlay);

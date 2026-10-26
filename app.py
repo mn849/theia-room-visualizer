@@ -36,6 +36,20 @@ server = app.server
 media_store.register(server)
 
 
+def _log_callback_error(sender, exception, **extra):  # pragma: no cover
+    """Record which Dash callback failed (output id + argument counts)."""
+    try:
+        from flask import request
+        body = request.get_json(silent=True) or {}
+        log_pipeline({"stage": "callback_error", "error": type(exception).__name__, "detail": str(exception)[:200], "output": str(body.get("output"))[:300], "n_inputs": len(body.get("inputs") or []), "n_state": len(body.get("state") or [])})
+    except Exception:
+        pass
+
+
+from flask import got_request_exception  # noqa: E402
+got_request_exception.connect(_log_callback_error, server)
+
+
 @server.route("/client-log", methods=["POST"])
 def client_log():  # pragma: no cover - exercised from the browser
     """Append browser diagnostics (errors + image-free layout snapshot)."""
