@@ -46,6 +46,14 @@ def _to_m(value: str, unit: str | None, default_unit: float) -> float:
 def parse_stated(title: str, description: str) -> tuple[dict[str, float], list[float]]:
     """Return labelled seller dimensions (metres) plus unlabelled AxBxC numbers."""
     text = html.unescape(f"{title}\n{description}").lower().replace("×", "x")
+    # Web-page noise ("width:100px", "height: 50%") is not a measurement.
+    text = re.sub(r"\d+(?:\.\d+)?\s*(?:px|%|r?em|vh|vw|pt)\b", " ", text)
+    # Sizes found in the seller's own text take priority over everything else.
+    seller = re.search(r"seller sizes:([^\n]*)", text)
+    if seller:
+        own, _ = parse_stated(seller.group(1), "")
+        if "width_m" in own and "height_m" in own:
+            return own, []
     text = re.sub(r"seat\s*height\s*[:=]?\s*\d+(?:\.\d+)?\s*(?:mm|cm|m|inches|inch|in|\"|”)?", " ", text)  # never mistake seat height for height
     default_unit = 0.01 if re.search(r"\d\s*cm\b", text) and not re.search(r"\d\s*(?:in|inch|inches|\"|”)\b", text) else INCH
     found: dict[str, float] = {}

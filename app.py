@@ -177,6 +177,15 @@ def parse_metadata(url: str) -> tuple[str, str | None, str, str, list[str]]:
         dimension_snippets = re.findall(r"[^<>{}]{0,80}(?:dimensions?|measurements?|width|height|depth)[^<>{}]{0,180}", visible_text, flags=re.I)
         if dimension_snippets:
             description += " " + " ".join(dimension_snippets[:6])
+        # Marketplace hides the full seller text in escaped JSON ("20.5\u201dW x
+        # 15\u201dD x 28\u201dH"); the short og:description is often cut off before
+        # the measurements. Decode the escapes and pull out any size patterns.
+        decoded = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), source)
+        decoded = decoded.replace("\\n", " ").replace('\\"', '"').replace("\\/", "/")
+        size_re = r"\d+(?:\.\d+)?\s*(?:\"|”|''|in(?:ches)?\b|cm\b|mm\b)?\s*[WwHhDdLl]\b\s*[x×X]\s*\d+(?:\.\d+)?\s*(?:\"|”|''|in(?:ches)?\b|cm\b|mm\b)?\s*[WwHhDdLl]\b(?:\s*[x×X]\s*\d+(?:\.\d+)?\s*(?:\"|”|''|in(?:ches)?\b|cm\b|mm\b)?\s*[WwHhDdLl]\b)?"
+        sizes = list(dict.fromkeys(re.findall(size_re, decoded)))[:3]
+        if sizes:
+            description += " Seller sizes: " + " ; ".join(sizes)
     structured_dimensions = {}
     for block in re.findall(r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', source, flags=re.I | re.S):
         try:
@@ -479,6 +488,7 @@ app.layout = html.Div([
                 html.Div(id="room-library", className="room-library"),
                 dcc.Input(id="listing-url", type="url", placeholder="Paste a Facebook Marketplace listing URL", className="text-input"),
                 dcc.Input(id="image-url", type="url", placeholder="Optional direct item-image URL", className="text-input"),
+                dcc.Textarea(id="listing-text", placeholder="Optional: paste the listing description here (Theia reads the measurements from it, e.g. 20.5\"W x 15\"D x 28\"H)", className="text-input listing-text", rows=3),
                 dcc.Upload(id="item-upload", children=html.Div([html.Strong("Or upload a listing screenshot"), html.Span("PNG or JPG", className="upload-help")], className="compact-upload"), className="compact-upload-zone"),
                 html.Button("Add item to room", id="add-item", className="primary-button"), dcc.Loading(html.Div(id="item-note", className="file-note"), type="dot", color="#1e5a4c"),
                 html.Details([html.Summary(id="history-summary", children="History of items you've tried"), html.Div(id="history-list", className="history-list")], className="history-panel", open=True),
@@ -599,25 +609,25 @@ def calibrate_room(_, measurement_type, measurement, unit, calibration):
     return {"dimensions_m": dimensions, "source": f"user-confirmed {labels.get(measurement_type, 'room')}", "confirmed": confirmed}, f"Room {labels.get(measurement_type)} set to {metres:.2f} m.{hint}"
 
 
-@app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Output("item-history", "data"), Output("listing-url", "value"), Output("image-url", "value"), Output("item-upload", "contents"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), State("item-history", "data"), prevent_initial_call=True)
-def add_item(_, listing_url, image_url, upload_contents, library, history):
+@app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Output("item-history", "data"), Output("listing-url", "value"), Output("image-url", "value"), Output("item-upload", "contents"), Output("listing-text", "value"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), State("item-history", "data"), State("listing-text", "value"), prevent_initial_call=True)
+def add_item(_, listing_url, image_url, upload_contents, library, history, pasted_text=None):
     """Add a listing to the room, keeping every item already there.
 
     Returns (library, note, history, cleared URL, cleared image URL, cleared
     upload) so a previous screenshot can never be reused for the next link.
     """
-    result = _add_item(listing_url, image_url, upload_contents, library)
+    result = _add_item(listing_url, image_url, upload_contents, library, pasted_text)
     new_library, note = result
     if new_library is no_update:
-        return no_update, note, no_update, no_update, no_update, no_update
+        return no_update, note, no_update, no_update, no_update, no_update, no_update
     added = [item for item in new_library if item["id"] not in {old["id"] for old in library or []}]
     history = list(history or [])
     known = {entry["id"] for entry in history}
     history = [{"id": item["id"], "added_at": datetime.now(timezone.utc).isoformat(), "item": item} for item in added if item["id"] not in known] + history
-    return new_library, note, history[:60], "", "", None
+    return new_library, note, history[:60], "", "", None, ""
 
 
-def _add_item(listing_url, image_url, upload_contents, library):
+def _add_item(listing_url, image_url, upload_contents, library, pasted_text=None):
     if not listing_url and not image_url and not upload_contents:
         return no_update, "Add a listing URL, direct image URL, or screenshot first."
     if len(library or []) >= MAX_ITEMS:
@@ -656,6 +666,9 @@ def _add_item(listing_url, image_url, upload_contents, library):
     gallery[0]["view"] = "front"
     hero = gallery[0]
     note = f"{note} · {len(gallery)} listing photo(s) cached at full resolution · {hero['method']}" + ("" if hero["cutout_ok"] else " · cutout unreliable, showing the untouched photo")
+    if pasted_text and pasted_text.strip():
+        # Text the user pasted from the listing is the most complete source.
+        description = f"{pasted_text.strip()[:6000]}\n{description}"
     agent_result = analyze_listing(title, description)
     # Seller text first; a single stated measurement is completed from the
     # item's own photo proportions (see measurements.py).
