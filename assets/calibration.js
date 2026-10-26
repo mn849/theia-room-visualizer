@@ -33,7 +33,7 @@
       marker.style.left = x + '%'; marker.style.top = y + '%';
       const tag = document.createElement('span');
       tag.className = 'floor-marker-tag';
-      tag.textContent = index + ' · ' + pointLabels[index - 1];
+      tag.textContent = index + '  ' + pointLabels[index - 1];
       if (y < 12) tag.classList.add('below');
       if (x > 78) tag.classList.add('left');
       marker.appendChild(tag);
