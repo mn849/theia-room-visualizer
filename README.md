@@ -2,11 +2,20 @@
 
 **Repository:** https://github.com/mn849/theia-room-visualizer · **Run locally:** see below (or double-click `Start Theia.command` on a Mac).
 
-Theia is a source-faithful room-visualization app for evaluating Facebook Marketplace furniture, art, and other objects in a real home. Upload a room photo, paste a public Marketplace listing URL or image URL, and compare several supplied items together in a calibrated 2D preview.
+Theia makes buying secondhand furniture less clunky. Paste a Facebook Marketplace listing URL and upload a photo of your room. Theia cuts the item out of the seller's own photos, reads its measurements from the listing, and places it in your room at its real size, in a 2D or 3D view. When you like an item, press ♡ and Theia drafts a short message to the seller for you.
+
+## Features
+
+- **Faithful cutouts:** the seller's real photo with only the background removed. One click shows the untouched photo.
+- **Real sizes from messy listings:** gpt-6-luna reads the full listing text and copies the seller's measurements. Every number is checked against the text, so none are invented. If only one size is given, the rest comes from the photo's proportions. If none is given, the size is labelled as an estimate. **Set size** lets you correct the height.
+- **Room sizing and perspective:** Theia works out the camera, floor and walls from one photo. Click four floor corners and enter the room width or length for accuracy. Items shrink as you drag them further back.
+- **2D and 3D views:** quick 2D placement on your photo, or a 3D walk-through of the rebuilt room.
+- **♡ Message the seller:** a second gpt-6-luna agent drafts a natural 2–4 sentence enquiry. You edit, copy and send it yourself; Theia never sends messages.
+- **Up to 15 items, plus history:** compare pieces together (pairs are split into separate, movable pieces) and bring back anything you removed from the session history.
 
 ## Current status
 
-The app currently focuses on Facebook Marketplace so its extraction rules can be tested against one consistent source. It reads public Open Graph, JSON-LD, and Marketplace bootstrap metadata, extracts seller-stated dimensions, and uses a narrow gpt-6-luna listing agent (the course-approved model) for category/pose/warning classification. Room uploads receive EXIF correction and optional panorama stitching. Users can click four visible floor corners for a planar correction, confirm room width/length/ceiling height in common units, and keep room/item libraries for the session. Item cutouts use an optional locally cached U²-Net model when available, with a conservative OpenCV fallback. It does not invent item details, authenticate to Facebook, scrape private listings, or claim that a 2D overlay proves fit. The agent falls back deterministically when no key is configured.
+Focused on Facebook Marketplace. Theia reads only public listing pages and never logs in. Facebook sometimes shortens the description it serves to logged-out requests; when the seller's measurements are cut off, Theia says the size is estimated. Cutouts use a locally installed segmentation model when available (U²-Net, ISNet or BiRefNet), with an OpenCV GrabCut fallback. With no API key, both agents fall back to deterministic, zero-token behaviour.
 
 ## Run locally
 
@@ -28,7 +37,7 @@ The preview is a 3D reconstruction of your room photo that opens at the exact vi
 - **3D walk-through:** opens at the photo's own viewpoint. Drag to look around, scroll or W/S to walk, A/D to step sideways, and **Reset view** returns to the photo. Movement stays within about 2 m of where the photo was taken, the range a single photo can show convincingly.
 - **Drag an item** to move it on the floor. Upright items snap flush against a wall (hold **Alt** to stop snapping); rugs lie flat; art (“Facing the wall”) slides along walls. **Q / E** or the rotation slider turn the selected item. A red footprint means the item does not fit inside the floor.
 - **Better accuracy:** click the four floor corners and confirm one room measurement. Without clicks, Theia estimates the camera tilt from vertical edges in the photo and assumes a 1.45 m phone height. The note under the preview always says which evidence was used.
-- **Items stay faithful:** an item is always the seller's own photo at the seller's dimensions. In each item card you can switch between the cutout and the untouched seller photo, and tag extra listing photos (left side, back, …); while orbiting, Theia shows the real photo nearest your viewing angle. Sides with no listing photo are drawn as a grey silhouette instead of being invented.
+- **Items stay faithful:** an item is always the seller's own photo at the seller's dimensions. In each item card you can switch between the cutout and the untouched seller photo, and tag extra listing photos (left side, back, …); while you move around in 3D, Theia shows the real photo nearest your viewing angle. Sides with no listing photo are drawn as a grey silhouette instead of being invented.
 - three.js is loaded from the jsDelivr CDN, so the 3D view needs an internet connection; without it the 2D preview is shown.
 
 ## Up to 15 items, saved on this device
@@ -81,8 +90,8 @@ The repository includes `render.yaml` and `Procfile`. Create a new Render Web Se
 
 1. 2D source-faithful placement (done; now the fallback view): room image, public listing metadata/image, transparent object cutout, floor-anchored drag placement, and explicit limitations.
 2. Automatic item scale (current): extract seller-stated dimensions from public metadata/description, otherwise use a labeled category estimate and a default room-size reference; users can replace the default with one confirmed room-width measurement for the session.
-3. Multi-angle room capture (current): upload overlapping room views; Theia corrects each view and attempts a feature-based panorama, while preserving the original angles in session storage.
-4. Session room and item libraries (current): keep room sets and up to 12 placed items in browser session storage so objects can be compared together.
+3. Multi-angle room capture (current): upload overlapping room views; Theia corrects each view and attempts a feature-based panorama, while preserving the original angles.
+4. Room and item libraries (current): up to 15 items per room, saved in the browser, with a session history.
 5. Better item cutouts (current): full-resolution, soft-alpha cutouts with colour-aware hole repair and a one-click switch back to the untouched seller photo.
 6. 3D room (current): single-photo camera/floor reconstruction, walk-through 3D view, wall snapping, view-dependent listing photos.
 7. Scale and fit: use seller dimensions only when present; otherwise label the overlay as unscaled.
