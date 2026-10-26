@@ -684,7 +684,7 @@ def _add_item(listing_url, image_url, upload_contents, library, pasted_text=None
     agent_result = analyze_listing(title, description)
     # Seller text first; a single stated measurement is completed from the
     # item's own photo proportions (see measurements.py).
-    dimensions, dimension_source, dimension_confidence = measurements.infer_dimensions(title, description, hero.get("aspect") if hero.get("cutout_ok") else hero.get("photo_aspect"), agent_result.get("category"))
+    dimensions, dimension_source, dimension_confidence = measurements.infer_dimensions(title, description, hero.get("aspect") if hero.get("cutout_ok") else hero.get("photo_aspect"), agent_result.get("category"), agent_result.get("dimensions"))
     room_prior_m = 4.0
     visual_scale = max(0.08, min(0.72, dimensions.get("width_m", 1.0) / room_prior_m))
     # Whole words only: "mat" used to match "material", "format", "automatic",
@@ -715,7 +715,7 @@ def _add_item(listing_url, image_url, upload_contents, library, pasted_text=None
                 view = {**hero, "cutout": url, "aspect": aspect, "view": "front"}
                 # Seller sizes in a "pair" listing describe ONE piece; any
                 # deduced size must use this piece's own photo, not the pair's.
-                piece_dims, piece_source, piece_conf = measurements.infer_dimensions(title, description, aspect, agent_result.get("category"))
+                piece_dims, piece_source, piece_conf = measurements.infer_dimensions(title, description, aspect, agent_result.get("category"), agent_result.get("dimensions"))
                 new_items.append({**base_item, "id": f"{group}-{k}", "group": group, "src": url, "gallery": [view], "title": f"{title} ({k} of {len(pieces)})", "display": "cutout", "dimensions": piece_dims, "dimension_source": piece_source, "dimension_confidence": piece_conf})
             log_pipeline({"stage": "split_listing", "pieces": len(pieces), "seller_quantity": expected})
     if len(library or []) + len(new_items) > MAX_ITEMS:
@@ -1069,7 +1069,7 @@ def render_preview(room, items, calibration, selected, positions):
             gallery = item.get("gallery") or []
             if gallery and isinstance(gallery[0], dict):
                 aspect = gallery[0].get("aspect")
-            dims, source, confidence = measurements.infer_dimensions(item.get("title", ""), item.get("raw_description", ""), aspect, (item.get("agent") or {}).get("category"))
+            dims, source, confidence = measurements.infer_dimensions(item.get("title", ""), item.get("raw_description", ""), aspect, (item.get("agent") or {}).get("category"), (item.get("agent") or {}).get("dimensions"))
             if abs(dims.get("width_m", 0) - (item.get("dimensions") or {}).get("width_m", 0)) > 0.01:
                 item = {**item, "dimensions": dims, "dimension_source": source, "dimension_confidence": confidence}
         refreshed.append(item)

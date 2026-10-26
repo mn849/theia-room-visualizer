@@ -118,9 +118,16 @@ def _view_factor(aspect: float, depth_ratio: float) -> float:
     return 1.0 + r * (0.34 - 0.21 * aspect)
 
 
-def infer_dimensions(title: str, description: str, aspect: float | None = None, agent_category: str | None = None) -> tuple[dict[str, float], str, str]:
-    """Return (dimensions in metres, source label, confidence label)."""
+def infer_dimensions(title: str, description: str, aspect: float | None = None, agent_category: str | None = None, agent_dims: dict | None = None) -> tuple[dict[str, float], str, str]:
+    """Return (dimensions in metres, source label, confidence label).
+
+    agent_dims: sizes gpt-6-luna read from the full listing text, already
+    verified to appear literally in that text. They take priority over the
+    regex parser, which is kept as the fallback."""
     stated, unlabelled = parse_stated(title, description)
+    if agent_dims and ("width_m" in agent_dims or "height_m" in agent_dims):
+        stated = {**{k: v for k, v in stated.items() if k == "seat_height_m"}, **agent_dims}
+        unlabelled = []
     category = category_of(title, description, agent_category)
     _, prior_ratio, depth_ratio = PRIORS.get(category, (None, 1.0, 0.6))
     aspect = aspect if aspect and 0.05 < aspect < 20 else None
@@ -151,17 +158,18 @@ def infer_dimensions(title: str, description: str, aspect: float | None = None, 
             return {"width_m": sizes[0], "depth_m": sizes[1], "height_m": 0.01}, "seller-stated rug size", "High: seller's own numbers"
     # Sanity check: page numbers that are far too small (or large) for this
     # kind of item are not its measurements (e.g. "2 drawers", hardware sizes).
-    prior_h = PRIORS.get(category, (None,))[0]
+    prior_h = PRIORS.get(category, (0.8,))[0]  # unknown item: assume furniture-sized
     if prior_h and prior_h > 0.3:
         for key in ("width_m", "height_m"):
-            if key in stated and not (0.25 * prior_h <= stated[key] <= 4 * prior_h + 0.5):
+            if key in stated and not (0.25 * prior_h <= stated[key] <= 2.5 * prior_h + 0.5):
                 stated.pop(key)
     has_w, has_h = "width_m" in stated, "height_m" in stated
     dims = dict(stated)
     if has_w and has_h:
         dims.setdefault("depth_m", min(dims["width_m"], dims["width_m"] * depth_ratio))
         complete = "depth_m" in stated
-        return dims, "seller-stated dimensions" + ("" if complete else " (depth estimated)"), "High: seller's own numbers" + ("" if complete else "; depth is a typical ratio")
+        label = "seller-stated dimensions (read from the listing by gpt-6-luna, verified against the text)" if agent_dims else "seller-stated dimensions"
+        return dims, label + ("" if complete else ", depth estimated"), "High: seller's own numbers" + ("" if complete else "; depth is a typical ratio")
     if has_h and not has_w:
         k = _view_factor(aspect or prior_ratio, depth_ratio)
         dims["width_m"] = dims["height_m"] * (aspect or prior_ratio) / k
