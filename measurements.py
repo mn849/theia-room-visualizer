@@ -146,6 +146,13 @@ def infer_dimensions(title: str, description: str, aspect: float | None = None, 
         sizes = sorted(unlabelled[:2] or [v for k, v in stated.items() if k in ("width_m", "height_m", "depth_m")], reverse=True)
         if len(sizes) >= 2:
             return {"width_m": sizes[0], "depth_m": sizes[1], "height_m": 0.01}, "seller-stated rug size", "High: seller's own numbers"
+    # Sanity check: page numbers that are far too small (or large) for this
+    # kind of item are not its measurements (e.g. "2 drawers", hardware sizes).
+    prior_h = PRIORS.get(category, (None,))[0]
+    if prior_h and prior_h > 0.3:
+        for key in ("width_m", "height_m"):
+            if key in stated and not (0.25 * prior_h <= stated[key] <= 4 * prior_h + 0.5):
+                stated.pop(key)
     has_w, has_h = "width_m" in stated, "height_m" in stated
     dims = dict(stated)
     if has_w and has_h:

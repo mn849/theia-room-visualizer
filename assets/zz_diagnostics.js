@@ -40,7 +40,7 @@
       stage.querySelectorAll('.item-overlay').forEach(function (o) {
         const img = o.querySelector('img');
         const cs = getComputedStyle(o);
-        snap.overlays.push({ rect: rect(o, stage), style: { left: o.style.left, top: o.style.top, width: o.style.width, transform: o.style.transform }, display: cs.display, opacity: cs.opacity, visibility: cs.visibility, img: img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, rendered: rect(img, stage) } : null });
+        snap.overlays.push({ rect: rect(o, stage), style: { left: o.style.left, top: o.style.top, width: o.style.width, transform: o.style.transform }, widthM: o.dataset.widthM, depthM: o.dataset.depthM, hasCamera: !!stage.dataset.camera, display: cs.display, opacity: cs.opacity, visibility: cs.visibility, img: img ? { complete: img.complete, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, rendered: rect(img, stage) } : null });
       });
     }
     const container = document.getElementById('scene3d');

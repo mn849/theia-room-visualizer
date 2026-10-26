@@ -723,6 +723,7 @@ def _add_item(listing_url, image_url, upload_contents, library, pasted_text=None
     updated = new_items + (library or [])
     item = new_items[0]
     dimensions, dimension_source = item["dimensions"], item["dimension_source"]
+    log_pipeline({"stage": "dimensions", "source": dimension_source, "width_m": round(dimensions.get("width_m", 0), 3), "height_m": round(dimensions.get("height_m", 0), 3), "description_chars": len(description)})
     split_note = f" Split into {len(new_items)} separate pieces you can move individually." if len(new_items) > 1 else ""
     return updated[:MAX_ITEMS], f"Added {title}{split_note} ({len(updated)} of {MAX_ITEMS} items in this room). Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
 
