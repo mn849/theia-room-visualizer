@@ -21,7 +21,7 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <section>
 <p class="kicker">MGT 409 · AI Foundations for Managers · Final project report</p>
 <h1>Theia</h1>
-<p class="lede">See a Facebook Marketplace find in your own room, in 3D, at the seller's real size, without the app inventing anything about it.</p>
+<p class="lede">Buying secondhand furniture shouldn't feel like homework. Theia lets you see a Facebook Marketplace find in your own room, at its real size, and writes the first message to the seller for you.</p>
 <div class="callout"><strong>Author:</strong> Minahil Naveed (minahil.naveed@yale.edu)<br>
 <strong>Repository:</strong> <a href="https://github.com/mn849/theia-room-visualizer">https://github.com/mn849/theia-room-visualizer</a><br>
 <strong>Run it:</strong> double-click <code>Start Theia.command</code> (Mac) or <code>python app.py</code>, then open <code>http://127.0.0.1:8050</code>. The README has the full steps.<br>
@@ -38,18 +38,21 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <!-- 2 · MOTIVATION -->
 <section class="pb">
 <p class="kicker">2 · Motivation</p>
-<h2>Secondhand furniture is cheap to buy and expensive to get wrong</h2>
-<p>Facebook Marketplace is where a lot of people furnish an apartment, especially students and people who move often. The listings are full of unusual and affordable pieces: spindle benches, mirrors, vintage chairs. The decision a buyer has to make is "will this look right and fit in my room?" The listing doesn't answer that. It shows the object against the seller's wall, often with no dimensions, or with dimensions buried in the description in an inconsistent format ("24 inch w", "24.5 h", "Seat height 18").</p>
-<h3>How people deal with it today</h3>
+<h2>Buying secondhand is clunky, cumbersome and frustrating</h2>
+<p>Facebook Marketplace is full of good, affordable furniture: a solid-wood bench for $60, a pair of antique side tables, a mirror nobody else has. For students, renters and anyone furnishing a first apartment, it's often the best place to shop. But buying there is far harder than it should be.</p>
+<h3>Listings are messy and inconsistent</h3>
+<p>Every listing is different. Some have measurements, many don't. When they do, they're written a dozen ways: "24 inch w", "20.5″W x 15″D x 28″H", "Seat height 18". The photos show the item against someone else's wall, in someone else's light. None of it tells you the one thing you need to know: <em>will this look right, and fit, in my room?</em></p>
+<h3>So buyers guess, or give up</h3>
 <ol>
-<li>Screenshot the listing and message the seller for measurements, then wait.</li>
-<li>Take a tape measure to the room and try to picture it.</li>
-<li>Or open a photo editor, cut the item out by hand, paste it into a room photo and resize it by eye. That takes 10–20 minutes per item and the scale is a guess.</li>
-<li>Repeat for every candidate listing, often under time pressure because good listings go fast.</li>
+<li>Screenshot the listing and try to picture it at home.</li>
+<li>Pull out a tape measure and compare numbers in your head.</li>
+<li>Or spend 10–20 minutes cutting the item out in a photo editor and pasting it into a photo of your room, guessing the scale.</li>
+<li>Then repeat for every listing you're considering, while good listings sell within hours.</li>
 </ol>
-<h3>What it costs</h3>
-<p>Getting it wrong is costly. Marketplace sales are usually final and pick-up only, so a piece that doesn't fit means renting a van, carrying it home, and then reselling it at a loss or abandoning it. Getting it right is slow: the buyer either waits on the seller or spends a long time in a photo editor for each item. The people most exposed are the ones Marketplace serves best: students, renters and first apartments, where budgets are tight and rooms are small.</p>
-<div class="callout"><strong>Goal:</strong> in a few minutes, a first-time user can put several real listings into their own room, at the right scale and perspective, look at them from different angles, and know which parts of the picture are measured, estimated or unknown.</div>
+<p>Getting it wrong is costly. Sales are usually pick-up only and final, so a piece that doesn't fit means renting a van, hauling it home, and reselling it at a loss. Many people simply don't take the risk and buy new instead.</p>
+<h3>And then you have to message a stranger</h3>
+<p>Even once you like something, you still have to write to the seller: ask if it's still available, ask for the measurement they left out, arrange a pick-up. It's a small task, but it takes mental energy, and that friction is enough to make people close the tab.</p>
+<div class="callout"><strong>The goal:</strong> make buying secondhand less clunky, less cumbersome and less frustrating. If people can see a messy, inconsistent listing in their own space, at the right size, and send the seller a message in one click, more of them will buy secondhand.</div>
 </section>
 
 <!-- 3 · WHAT IS NEW -->
@@ -67,13 +70,15 @@ pre{background:#26332e;color:#f6f3ec;padding:14px 16px;overflow:auto;font-size:1
 <tr><td>Facebook Marketplace itself</td><td>Listing photos and text</td><td>No visualisation and no structured dimensions.</td></tr>
 </table>
 <h3>What Theia does differently</h3>
-<ul>
-<li><strong>Works on any listing.</strong> It reads public Marketplace metadata and seller dimensions, or a screenshot or image URL. No catalogue model is needed.</li>
-<li><strong>Keeps the item faithful.</strong> Theia only removes background. Every item pixel is the seller's own, and one click switches back to the untouched photo. Sides no photo shows are drawn as a grey silhouette, not generated.</li>
-<li><strong>Builds 3D from one ordinary photo.</strong> It recovers the camera height, tilt and lens, the floor plane and the walls from a single room photo, so items stand upright, sit flush against walls and shrink correctly with distance. You can orbit, pan and zoom around them.</li>
-<li><strong>2D or 3D, the user chooses.</strong> The quick 2D mode drags the item over the photo. The 3D mode opens at the photo's own viewpoint and lets you walk around. Both use the same faithful cutouts and seller dimensions.</li>
-<li><strong>Shows its evidence.</strong> Every number says where it came from: seller-stated, category estimate, EXIF lens, clicked floor corners, or an assumed phone height.</li>
-</ul>
+<p>Theia works with the listings people actually find: one-off secondhand items with a few phone photos and inconsistent text. Here is what it does, feature by feature.</p>
+<div class="grid">
+<div class="card"><h3 style="margin-top:0">1 · Faithful cutouts</h3><p>Theia removes the background from the seller's own photos and keeps every pixel of the item itself, including thin legs, spindles and patterned upholstery. Nothing is redrawn, and one click switches back to the untouched photo.</p></div>
+<div class="card"><h3 style="margin-top:0">2 · Real sizes from messy listings</h3><p>gpt-6-luna reads the whole listing and pulls out the seller's measurements in any format. Every number is checked against the listing text, so the model can't invent a size. If only one size is given, Theia works out the rest from the photo. If none is given, it estimates and says so. The user can always correct the height.</p></div>
+<div class="card"><h3 style="margin-top:0">3 · Room sizing and perspective</h3><p>From a single room photo, Theia works out where the camera was, the floor and the walls. Clicking four floor corners and entering one room measurement (width or length) makes it accurate. Items then stand on the floor at their true size, and get smaller as you drag them further back, just as they would in real life.</p></div>
+<div class="card"><h3 style="margin-top:0">4 · 2D and 3D views</h3><p>The quick 2D view places items straight onto your photo. The 3D view rebuilds the room and lets you look around and step through it. Items snap flush to walls, and pairs like bedside tables are split so each piece moves on its own.</p></div>
+<div class="card"><h3 style="margin-top:0">5 · Message the seller in one click</h3><p>Press ♡ Love it and a second agent drafts a short, natural first message: it asks if the item is still available, asks for any missing measurement, and offers to pick it up. You can edit it, copy it, and open the listing. Theia never sends anything for you.</p></div>
+<div class="card"><h3 style="margin-top:0">6 · Compare up to 15 items, with history</h3><p>Up to 15 items can sit in the room at once and stay where you put them. A history panel lists every listing you've tried this session, so you can bring back anything you removed.</p></div>
+</div>
 <p class="small">Honest caveat: we compared against these products from their public descriptions and our own use, not a formal benchmark. Some of them do render better when a catalogue 3D model exists. Theia's advantage is coverage of one-off secondhand items and trustworthiness, not visual polish.</p>
 </section>
 
@@ -324,7 +329,8 @@ overspending tests passed
 seller message tests passed
 </code></pre>
 <h3>Engineering log (git history)</h3>
-<pre><code>2026-10-26 17:38  Report/slides: real user feedback (friend furnishing his living room), honest impact claims, Marketplace overlay as next step
+<pre><code>2026-10-26 17:44  Add GitHub repository link to README, report and slides
+2026-10-26 17:38  Report/slides: real user feedback (friend furnishing his living room), honest impact claims, Marketplace overlay as next step
 2026-10-26 17:38  Add Claude sharing archive
 2026-10-26 17:33  Report: real screenshots from testing, updated agents/tokenomics (luna), limits and live-testing bug fixes
 2026-10-26 17:29  Listing fetch: try Theia, browser and link-preview requests, strip tracking params, combine whatever Facebook returns (fixes 400 Bad Request)
@@ -347,8 +353,7 @@ seller message tests passed
 2026-10-26 16:35  Browser diagnostics: JS errors + image-free layout snapshots logged to logs/client_diagnostics.jsonl
 2026-10-26 16:31  3D: new items start centred and inside the photo&#x27;s field of view; reset stale saved placements
 2026-10-26 16:24  Up to 15 items per room, saved on the device (local storage); 2D positions persist across adds; 15-item limit prompt; 7-day media retention
-2026-10-26 16:20  Rotation slider turns the item (2D rotateY + instant DOM update; 3D card follows yaw up to 75deg); heart never fails silently
-2026-10-26 16:13  Heart an item: seller-message agent drafts an editable 2-4 sentence enquiry (validated, template fallback, never sends); tests + docs</code></pre>
+2026-10-26 16:20  Rotation slider turns the item (2D rotateY + instant DOM update; 3D card follows yaw up to 75deg); heart never fails silently</code></pre>
 <p class="small">Prepared 26 October 2026. Claims distinguish measured results (tests, logs) from labelled estimates.</p>
 </section>
 </main></body></html>
