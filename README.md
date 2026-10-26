@@ -1,5 +1,7 @@
 # Theia
 
+**Repository:** https://github.com/mn849/theia-room-visualizer · **Run locally:** see below (or double-click `Start Theia.command` on a Mac).
+
 Theia is a source-faithful room-visualization app for evaluating Facebook Marketplace furniture, art, and other objects in a real home. Upload a room photo, paste a public Marketplace listing URL or image URL, and compare several supplied items together in a calibrated 2D preview.
 
 ## Current status
