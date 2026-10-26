@@ -430,7 +430,7 @@ app.layout = html.Div([
                 html.Button("Add item to room", id="add-item", className="primary-button"), html.Div(id="item-note", className="file-note"),
             ], className="capture-panel"),
             html.Div([
-                html.Div([html.Div([html.P("PREVIEW", className="eyebrow"), html.H2("Your room"), html.Span("PHOTO VIEW ⇄ 3D", className="status-pill")], className="preview-title"), html.Div([html.Div(id="scene3d", className="scene3d"), html.Div(id="stage", children=empty_stage(), className="preview-canvas")], id="preview-wrap", className="preview-wrap"), html.Div(id="scene-notes", className="scene-notes")]),
+                html.Div([html.Div([html.P("PREVIEW", className="eyebrow"), html.H2("Your room"), dcc.RadioItems(id="view-mode", options=[{"label": "2D photo", "value": "2d"}, {"label": "3D room", "value": "3d"}], value="2d", inline=True, className="view-mode-toggle", persistence=True, persistence_type="session")], className="preview-title"), html.Div([html.Div(id="scene3d", className="scene3d"), html.Div(id="stage", children=empty_stage(), className="preview-canvas")], id="preview-wrap", className="preview-wrap"), html.Div(id="scene-notes", className="scene-notes")]),
                 html.Div(id="item-library", className="item-library"),
                 html.Div([html.P("ORIENTATION", className="eyebrow"), dcc.Dropdown(id="item-select", options=[], placeholder="Choose an item", clearable=False, className="item-select"), dcc.Dropdown(id="item-pose", options=[{"label":"Standing / upright", "value":"upright"}, {"label":"Flat on the floor", "value":"flat"}, {"label":"Facing the wall", "value":"wall"}], value="upright", clearable=False, className="item-select"), dcc.Slider(id="item-rotation", min=-180, max=180, step=1, value=0, marks={-180: "−180°", 0: "Straight", 180: "+180°"}, tooltip={"placement": "bottom", "always_visible": True}), html.Small("Choose how the object sits in the room, then rotate it (or press Q / E in the 3D view). Upright items snap flush to a wall when dragged close to it; rugs lie flat; art hangs on walls.", className="control-note")], className="orientation-controls"),
                 html.Button("Clear saved items", id="clear-items", className="clear-button"),
@@ -599,6 +599,15 @@ def remove_item(_, items):
     return remaining, "Item removed from this session."
 
 
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Input("item-rotation", "value"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
+def rotate_item(rotation, selected_id, items):
+    """Rotation for the 2D preview (the 3D view keeps its own yaw in item-placements)."""
+    current = next((item for item in items or [] if item.get("id") == selected_id), None)
+    if not current or float(current.get("rotation", 0)) == float(rotation or 0):
+        return no_update
+    return [{**item, "rotation": float(rotation or 0)} if item.get("id") == selected_id else item for item in items]
+
+
 @app.callback(Output("item-library-data", "data", allow_duplicate=True), Input("item-pose", "value"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
 def pose_item(pose, selected_id, items):
     if not selected_id or not items:
@@ -678,11 +687,11 @@ def update_scene(room, calibration, items):
 
 
 app.clientside_callback(
-    """function(scene, placements, selected) {
-        if (window.TheiaScene) { window.TheiaScene.update(scene, placements || {}, selected || null); }
+    """function(scene, placements, selected, mode) {
+        if (window.TheiaScene) { window.TheiaScene.update(scene, placements || {}, selected || null, mode || '2d'); }
         return window.dash_clientside.no_update;
     }""",
-    Output("scene-sink", "data"), Input("scene-data", "data"), Input("item-placements", "data"), Input("item-select", "value"),
+    Output("scene-sink", "data"), Input("scene-data", "data"), Input("item-placements", "data"), Input("item-select", "value"), Input("view-mode", "value"),
 )
 
 app.clientside_callback(

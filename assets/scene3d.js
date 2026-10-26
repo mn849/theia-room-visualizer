@@ -491,14 +491,17 @@
 
   function goOrbitView() {
     setMode('orbit');
+    // Swing ~30 degrees around the selected item (or the floor centre) and
+    // rise a little, so the photo texture stays mostly valid.
     const centre = selectedPosition() || floorCentre();
     const pc = state.photoCam;
-    const offset = new THREE.Vector3(pc.position.x - centre.x, 0, pc.position.z - centre.z).normalize();
-    const side = new THREE.Vector3(-offset.z, 0, offset.x);
-    const pos = centre.clone().add(offset.multiplyScalar(2.6)).add(side.multiplyScalar(1.8)).setY(1.6);
-    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, centre.clone().setY(0.5), new THREE.Vector3(0, 1, 0)));
+    const target = centre.clone().setY(0.45);
+    const offset = pc.position.clone().sub(target);
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(30));
+    const pos = target.clone().add(offset).add(new THREE.Vector3(0, 0.35, 0));
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(pos, target, new THREE.Vector3(0, 1, 0)));
     state.controls.enabled = false;
-    animateTo(pos, q, function () { state.controls.target.copy(centre.clone().setY(0.5)); state.controls.enabled = true; });
+    animateTo(pos, q, function () { state.controls.target.copy(target); state.controls.enabled = true; });
   }
 
   function goTopView() {
@@ -620,6 +623,12 @@
     const args = pending;
     const data = args.scene;
     const stageWrap = document.getElementById('preview-wrap');
+    if (args.mode !== '3d') {
+      if (stageWrap) stageWrap.classList.remove('is-3d');
+      container.style.display = 'none';
+      if (state) state.renderer.setAnimationLoop(null);
+      return;
+    }
     if (!data || !data.room || !data.room.scene) {
       if (stageWrap) stageWrap.classList.remove('is-3d');
       container.style.display = 'none';
@@ -633,6 +642,7 @@
     }
     ensureViewer(container);
     container.style.display = 'block';
+    state.renderer.setAnimationLoop(tick);
     if (stageWrap) stageWrap.classList.add('is-3d');
     const roomKey = JSON.stringify([data.room.src, data.room.scene.camera, data.room.scene.floor, data.room.scene.ceiling_m, !!data.room.depth]);
     const roomChanged = roomKey !== lastSceneKey;
@@ -659,8 +669,9 @@
   }
 
   window.TheiaScene = {
-    update: function (scene, placements, selected) {
-      pending = { scene: scene, placements: placements, selected: selected };
+    update: function (scene, placements, selected, mode) {
+      pending = { scene: scene, placements: placements, selected: selected, mode: mode || '2d' };
+      if (pending.mode !== '3d' && !THREE) { render(); return; }
       loadThree().then(render);
     },
     snapshot: function () { return state ? state.renderer.domElement.toDataURL('image/png') : null; },

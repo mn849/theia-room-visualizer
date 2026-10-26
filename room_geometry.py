@@ -206,6 +206,22 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
         far_mid = (m1 * 0.5 + m2 + m3) / lam
         near_mid = (m1 * 0.5 + m3) / lam
         pose = _pose_from_up(up, cam_height, far_mid - near_mid)
+        refined = None
+        # Four hand-clicked points are rarely a perfect rectangle, which shows
+        # up as a tilted or rolled camera. When the photo has enough straight
+        # vertical edges, trust them for tilt/roll and use the clicks only for
+        # where the floor and walls are.
+        if rgb is not None:
+            vp_up, support = vertical_up_from_lines(rgb, focal)
+            clicks = (far_left, far_right, near_right, near_left)
+            if vp_up is not None and support >= 8 and all(float(vp_up @ np.array([u / focal, v / focal, 1.0])) < -1e-3 for u, v in clicks):
+                trial = _pose_from_up(vp_up, 1.0, far_mid - near_mid)
+                fl_unit, fr_unit = _ray_floor(trial, *far_left, focal), _ray_floor(trial, *far_right, focal)
+                far_len = float(np.linalg.norm(fr_unit - fl_unit)) if fl_unit is not None and fr_unit is not None else 0.0
+                if far_len > 1e-6:
+                    cam_height = dims["width_m"] / far_len if width_confirmed else PHONE_HEIGHT_M
+                    pose = _pose_from_up(vp_up, cam_height, far_mid - near_mid)
+                    refined = f"{support} vertical edges"
         world_corners = []
         for u, v in (far_left, far_right, near_right, near_left):
             hit = _ray_floor(pose, u, v, focal)
@@ -214,7 +230,7 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
             notes.append("The clicked floor corners gave an implausible camera; using automatic estimate instead.")
             pose, world_corners = None, None
         else:
-            layout_source = "clicked floor corners"
+            layout_source = "clicked floor corners" + (f" + tilt from {refined}" if refined else "")
             if not width_confirmed:
                 dims["width_m"] = float(np.linalg.norm(world_corners[1] - world_corners[0]))
             notes.append(f"Scale from {scale_source}.")
@@ -252,7 +268,8 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
         {"name": "near", "a": floor_xz[2], "b": floor_xz[3]},
         {"name": "left", "a": floor_xz[3], "b": floor_xz[0]},
     ]
-    confidence = "measured" if layout_source == "clicked floor corners" and width_confirmed else ("good" if layout_source == "clicked floor corners" else "rough")
+    clicked = layout_source.startswith("clicked floor corners")
+    confidence = "measured" if clicked and width_confirmed else ("good" if clicked else "rough")
     return {
         "camera": camera, "floor": floor_xz, "walls": walls, "ceiling_m": room_h,
         "layout_source": layout_source, "focal_source": focal_source, "confidence": confidence,
