@@ -406,14 +406,17 @@ def build_room_scene(room: dict, calibration: dict | None) -> dict | None:
     if not src:
         return None
     dims = {"width_m": 4.0, "length_m": 4.0, "height_m": 2.5, **(calibration or {}).get("dimensions_m", {})}
-    width_confirmed = (calibration or {}).get("source", "") == "user-confirmed width"
+    confirmed = set((calibration or {}).get("confirmed") or [])
+    source = (calibration or {}).get("source", "")
+    width_confirmed = "width_m" in confirmed or source == "user-confirmed width"
+    length_confirmed = "length_m" in confirmed or source == "user-confirmed length"
     floor_points = room.get("floor_points")
-    key = hashlib.sha1(json.dumps([src[:200], len(src), floor_points, dims, width_confirmed, room.get("f35"), depth_model.available()], sort_keys=True).encode()).hexdigest()[:16]
+    key = hashlib.sha1(json.dumps([src[:200], len(src), floor_points, dims, width_confirmed, length_confirmed, room.get("f35"), depth_model.available()], sort_keys=True).encode()).hexdigest()[:16]
     if key in _scene_cache:
         return _scene_cache[key]
     image = media_store.open_image(src).convert("RGB")
     rgb = np.asarray(image) if np is not None else None
-    scene = room_geometry.estimate_scene(image.width, image.height, f35=room.get("f35"), floor_points=floor_points, room_dims=dims, width_confirmed=width_confirmed, rgb=rgb)
+    scene = room_geometry.estimate_scene(image.width, image.height, f35=room.get("f35"), floor_points=floor_points, room_dims=dims, width_confirmed=width_confirmed, length_confirmed=length_confirmed, rgb=rgb)
     if room.get("panorama"):
         scene["notes"].append("Stitched panoramas are not a single camera view; for the most accurate 3D, upload one photo.")
     depth = None
@@ -585,13 +588,15 @@ def select_saved_room(_, library):
 @app.callback(Output("room-calibration", "data"), Output("calibration-note", "children"), Input("calibrate-room", "n_clicks"), State("measurement-type", "value"), State("room-measurement", "value"), State("measurement-unit", "value"), State("room-calibration", "data"), prevent_initial_call=True)
 def calibrate_room(_, measurement_type, measurement, unit, calibration):
     if not measurement or measurement <= 0:
-        return no_update, "Enter a positive room width in metres."
+        return no_update, "Enter a positive measurement first."
     dimensions = {"width_m": 4.0, "length_m": 4.0, "height_m": 2.5, **(calibration or {}).get("dimensions_m", {})}
     factors = {"m": 1.0, "cm": 0.01, "ft": 0.3048, "in": 0.0254}
     metres = float(measurement) * factors.get(unit, 1.0)
     dimensions[measurement_type] = metres
     labels = {"width_m": "width", "length_m": "length", "height_m": "ceiling height"}
-    return {"dimensions_m": dimensions, "source": f"user-confirmed {labels.get(measurement_type, 'room')}"}, f"Scale calibrated with {measurement:g} {unit} ({metres:.2f} m) for this session."
+    confirmed = sorted(set((calibration or {}).get("confirmed") or []) | {measurement_type})
+    hint = " Click the four floor corners and apply them so Theia can use it for scale." if measurement_type in ("width_m", "length_m") else " Used for the ceiling in 3D."
+    return {"dimensions_m": dimensions, "source": f"user-confirmed {labels.get(measurement_type, 'room')}", "confirmed": confirmed}, f"Room {labels.get(measurement_type)} set to {metres:.2f} m.{hint}"
 
 
 @app.callback(Output("item-library-data", "data"), Output("item-note", "children"), Output("item-history", "data"), Output("listing-url", "value"), Output("image-url", "value"), Output("item-upload", "contents"), Input("add-item", "n_clicks"), State("listing-url", "value"), State("image-url", "value"), State("item-upload", "contents"), State("item-library-data", "data"), State("item-history", "data"), prevent_initial_call=True)

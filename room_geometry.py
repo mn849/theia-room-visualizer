@@ -162,7 +162,7 @@ def _line_at_z(a: np.ndarray, b: np.ndarray, z: float) -> np.ndarray:
 
 
 def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_points: list | None = None,
-                   room_dims: dict | None = None, width_confirmed: bool = False,
+                   room_dims: dict | None = None, width_confirmed: bool = False, length_confirmed: bool = False,
                    rgb: np.ndarray | None = None) -> dict[str, Any]:
     """Return camera pose, room box and evidence notes for one photo."""
     dims = {"width_m": 4.0, "length_m": 4.0, "height_m": 2.5, **(room_dims or {})}
@@ -236,6 +236,21 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
                             cam_height = trial_height
                             pose = _pose_from_up(candidate, cam_height, far_mid - near_mid)
                             refined = f"{support} vertical edges"
+        if length_confirmed and not width_confirmed:
+            # Room length = from the wall behind the photographer to the back
+            # wall. People usually stand ~0.3 m from the wall behind them, so
+            # the back wall (the clicked far edge) is (length - 0.3) m ahead.
+            trial = _pose_from_up(pose["Y"], 1.0, far_mid - near_mid)
+            fl_unit, fr_unit = _ray_floor(trial, *far_left, focal), _ray_floor(trial, *far_right, focal)
+            if fl_unit is not None and fr_unit is not None:
+                far_unit = -float(fl_unit[2] + fr_unit[2]) / 2  # forward distance per metre of camera height
+                if far_unit > 1e-6:
+                    wanted = max(1.0, float(dims["length_m"]) - 0.3)
+                    cam_height = float(np.clip(wanted / far_unit, 0.6, 2.4))
+                    if abs(cam_height - wanted / far_unit) > 1e-6:
+                        notes.append("Your room length implied an unusual camera height; it was limited to a realistic 0.6-2.4 m.")
+                    pose = _pose_from_up(pose["Y"], cam_height, far_mid - near_mid)
+                    scale_source = "your confirmed room length (back wall = length - 0.3 m from the camera)"
         world_corners = []
         for u, v in (far_left, far_right, near_right, near_left):
             hit = _ray_floor(pose, u, v, focal)
@@ -283,7 +298,7 @@ def estimate_scene(width: int, height: int, *, f35: float | None = None, floor_p
         {"name": "left", "a": floor_xz[3], "b": floor_xz[0]},
     ]
     clicked = layout_source.startswith("clicked floor corners")
-    confidence = "measured" if clicked and width_confirmed else ("good" if clicked else "rough")
+    confidence = "measured" if clicked and (width_confirmed or length_confirmed) else ("good" if clicked else "rough")
     return {
         "camera": camera, "floor": floor_xz, "walls": walls, "ceiling_m": room_h,
         "layout_source": layout_source, "focal_source": focal_source, "confidence": confidence,
