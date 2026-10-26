@@ -6,6 +6,7 @@ import base64
 import io
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 from uuid import uuid4
 import html as html_lib
 from urllib.parse import urljoin, urlparse
@@ -14,14 +15,8 @@ import requests
 from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
 from PIL import Image, ImageOps
 from listing_agent import analyze_listing
-
-try:
-    from rembg import new_session as _new_rembg_session, remove as _rembg_remove
-except ImportError:  # Optional local model; GrabCut remains the zero-install fallback.
-    _new_rembg_session = None
-    _rembg_remove = None
-
-_rembg_session = None
+import item_cutout
+import media_store
 
 try:
     import cv2
@@ -33,6 +28,7 @@ except ImportError:  # EXIF correction still works without optional CV packages.
 app = Dash(__name__, title="Theia | Visualize a listing")
 app.config.suppress_callback_exceptions = True
 server = app.server
+media_store.register(server)
 app.index_string = """<!DOCTYPE html>
 <html>
     <head>
@@ -249,127 +245,31 @@ def correct_room_orientation(contents: str) -> tuple[str, str]:
     return f"data:image/jpeg;base64,{base64.b64encode(output.getvalue()).decode()}", method
 
 
-def make_item_cutout(source: str, item_title: str = "") -> tuple[str, str]:
-    """Make a conservative transparent cutout from a listing image.
+def log_pipeline(event: dict) -> None:
+    """Append a non-sensitive pipeline record (no image data, no URLs)."""
+    try:
+        path = Path(__file__).resolve().parent / "logs" / "pipeline_events.jsonl"
+        path.parent.mkdir(exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"timestamp": datetime.now(timezone.utc).isoformat(), **event}) + "\n")
+    except OSError:
+        pass
 
-    GrabCut is deliberately presented as an assistive preview: complex images can
-    still need a future user-confirmed crop/mask editor.
+
+def process_listing_photo(source: str, referer: str | None = None) -> dict:
+    """Cache one seller photo at full resolution and build a faithful cutout.
+
+    The returned record keeps both versions so the user can always switch back
+    to the untouched seller photo.
     """
-    if source.startswith("data:"):
-        _, encoded = source.split(",", 1)
-        raw = base64.b64decode(encoded)
-    else:
-        response = requests.get(source, timeout=10, headers={"User-Agent": "Theia/0.1"})
-        response.raise_for_status()
-        raw = response.content
-    image = Image.open(io.BytesIO(raw)).convert("RGBA")
-    if cv2 is None or np is None:
-        output = io.BytesIO(); image.save(output, format="PNG")
-        return f"data:image/png;base64,{base64.b64encode(output.getvalue()).decode()}", "original listing image"
-    max_side = 800
-    if max(image.size) > max_side:
-        scale = max_side / max(image.size)
-        image = image.resize((int(image.width * scale), int(image.height * scale)), Image.Resampling.LANCZOS)
-    # If the optional U²-Net model is already available locally, prefer it for
-    # natural photographs. It handles furniture silhouettes and holes much
-    # better than a rectangle-initialised GrabCut. Never download model weights
-    # inside a user action; missing weights simply use the local fallback.
-    global _rembg_session
-    model_path = Path.home() / ".rembg" / "models" / "u2net" / "u2net.onnx"
-    if _rembg_remove is not None and model_path.exists():
-        try:
-            if _rembg_session is None:
-                _rembg_session = _new_rembg_session("u2net")
-            raw_output = io.BytesIO()
-            image.save(raw_output, format="PNG", optimize=True)
-            cutout_bytes = _rembg_remove(raw_output.getvalue(), session=_rembg_session)
-            cutout = Image.open(io.BytesIO(cutout_bytes)).convert("RGBA")
-            alpha = cutout.getchannel("A")
-            if any(word in item_title.lower() for word in ("stool", "bench", "chair", "sofa", "seat", "table", "desk", "cabinet")) and cv2 is not None and np is not None:
-                # Low-contrast upholstery is often marked translucent by
-                # general segmentation models. Close small gaps so the seat
-                # remains part of furniture without restoring the full photo.
-                alpha_array = np.array(alpha)
-                # Pale upholstery is often assigned a weak alpha by the
-                # segmentation model. Furniture pixels above this small
-                # confidence threshold should remain solid rather than ghosted.
-                alpha_array = np.where(alpha_array >= 8, 255, 0).astype(np.uint8)
-                # A broad horizontal close reconnects upholstered seats and
-                # tabletops that segmentation models break into little holes.
-                furniture_kernel = cv2.getStructuringElement(
-                    cv2.MORPH_ELLIPSE,
-                    (max(9, int(cutout.width * 0.08)), max(5, int(cutout.height * 0.03))),
-                )
-                alpha_array = cv2.morphologyEx(alpha_array, cv2.MORPH_CLOSE, furniture_kernel)
-                alpha = Image.fromarray(alpha_array, mode="L")
-                cutout.putalpha(alpha)
-            bbox = alpha.getbbox()
-            if bbox and (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) > image.width * image.height * 0.02:
-                pad = max(4, int(min(cutout.size) * 0.02))
-                bbox = (max(0, bbox[0] - pad), max(0, bbox[1] - pad), min(cutout.width, bbox[2] + pad), min(cutout.height, bbox[3] + pad))
-                cutout = cutout.crop(bbox)
-                output = io.BytesIO(); cutout.save(output, format="PNG", optimize=True)
-                return f"data:image/png;base64,{base64.b64encode(output.getvalue()).decode()}", "AI-assisted object cutout · review edges"
-        except Exception:
-            pass
-    rgb = np.array(image.convert("RGB"))
-    height, width = rgb.shape[:2]
-    margin = max(4, int(min(width, height) * 0.03))
-    rect = (margin, margin, max(1, width - margin * 2), max(1, height - margin * 2))
-    bgd_model = np.zeros((1, 65), np.float64)
-    fgd_model = np.zeros((1, 65), np.float64)
-    masks = []
-    # Pass one lets GrabCut estimate the background from the image border.
-    rect_mask = np.zeros((height, width), np.uint8)
-    cv2.grabCut(rgb, rect_mask, rect, bgd_model, fgd_model, 7, cv2.GC_INIT_WITH_RECT)
-    masks.append(rect_mask)
-    # Pass two makes the outer border definitely background. This is more
-    # reliable for marketplace photos with a large beige/white wall behind an
-    # object, where the rectangle initialisation can keep the whole wall.
-    border_mask = np.full((height, width), cv2.GC_PR_FGD, np.uint8)
-    border = max(8, int(min(width, height) * 0.08))
-    border_mask[:border, :] = cv2.GC_BGD; border_mask[-border:, :] = cv2.GC_BGD
-    border_mask[:, :border] = cv2.GC_BGD; border_mask[:, -border:] = cv2.GC_BGD
-    cv2.grabCut(rgb, border_mask, None, bgd_model, fgd_model, 7, cv2.GC_INIT_WITH_MASK)
-    masks.append(border_mask)
-    def score(candidate):
-        binary = (candidate == cv2.GC_FGD) | (candidate == cv2.GC_PR_FGD)
-        border_pixels = np.concatenate((binary[:border, :].ravel(), binary[-border:, :].ravel(), binary[:, :border].ravel(), binary[:, -border:].ravel()))
-        area = float(binary.mean())
-        contamination = float(border_pixels.mean())
-        # Prefer a compact object with little foreground touching the frame.
-        return contamination * 3.0 + abs(area - 0.35)
-    chosen = min(masks, key=score)
-    foreground = np.where((chosen == cv2.GC_FGD) | (chosen == cv2.GC_PR_FGD), 255, 0).astype(np.uint8)
-    # Remove tiny isolated specks while preserving narrow legs and frames.
-    kernel = np.ones((3, 3), np.uint8)
-    foreground = cv2.morphologyEx(foreground, cv2.MORPH_OPEN, kernel, iterations=1)
-    alpha = Image.fromarray(foreground, mode="L")
-    result = image.copy(); result.putalpha(alpha)
-    bbox = alpha.getbbox()
-    if bbox:
-        pad = max(4, int(min(width, height) * 0.02))
-        bbox = (max(0, bbox[0] - pad), max(0, bbox[1] - pad), min(width, bbox[2] + pad), min(height, bbox[3] + pad))
-        result = result.crop(bbox)
-    output = io.BytesIO(); result.save(output, format="PNG", optimize=True)
-    return f"data:image/png;base64,{base64.b64encode(output.getvalue()).decode()}", "automatic object cutout · review edges"
-
-
-def cache_item_image(source: str, referer: str | None = None) -> str:
-    """Convert an external image to a local data URL so hotlink protection cannot blank the preview."""
-    if source.startswith("data:"):
-        return source
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; Theia/0.1)"}
-    if referer:
-        headers["Referer"] = referer
-    response = requests.get(source, timeout=12, headers=headers)
-    response.raise_for_status()
-    if not response.headers.get("content-type", "").lower().startswith("image/"):
-        raise ValueError("listing image URL returned a web page instead of an image")
-    image = Image.open(io.BytesIO(response.content)).convert("RGB")
-    image.thumbnail((900, 900), Image.Resampling.LANCZOS)
-    output = io.BytesIO(); image.save(output, format="JPEG", quality=88, optimize=True)
-    return f"data:image/jpeg;base64,{base64.b64encode(output.getvalue()).decode()}"
+    photo = media_store.open_image(source, referer).convert("RGB")
+    photo.thumbnail((item_cutout.MAX_SIDE, item_cutout.MAX_SIDE), Image.Resampling.LANCZOS)
+    photo_url = media_store.save_image(photo, "JPEG", quality=93)
+    cutout, report = item_cutout.make_cutout(photo)
+    cutout_url = media_store.save_image(cutout, "PNG") if report.get("ok") else photo_url
+    photo_aspect = round(photo.width / max(1, photo.height), 4)
+    log_pipeline({"stage": "cutout", **{k: v for k, v in report.items() if k != "model_error"}})
+    return {"photo": photo_url, "cutout": cutout_url, "cutout_ok": bool(report.get("ok")), "aspect": report.get("aspect", photo_aspect) if report.get("ok") else photo_aspect, "photo_aspect": photo_aspect, "method": report.get("method", "original photo"), "coverage": report.get("coverage"), "view": None}
 
 
 def stitch_room_images(images: list[str]) -> tuple[str, str]:
@@ -553,29 +453,21 @@ def add_item(_, listing_url, image_url, upload_contents, library):
         note = f"{note} · uploaded screenshot used"
     if not source_image:
         return no_update, "The listing loaded without an accessible image. Add a direct image URL or screenshot."
-    try:
-        candidates = list(dict.fromkeys(([image_url] if image_url else []) + ([upload_contents] if upload_contents and not image_url else []) + listing_images + ([source_image] if source_image else [])))[:5]
-        cutouts = []
-        for candidate in candidates:
-            try:
-                cached = cache_item_image(candidate, listing_url)
-                cutout, cutout_note = make_item_cutout(cached, title)
-                # Prefer a cutout with a substantial, coherent foreground;
-                # gallery images often differ greatly in background quality.
-                _, encoded = cutout.split(",", 1)
-                preview = Image.open(io.BytesIO(base64.b64decode(encoded))).convert("RGBA")
-                alpha = np.array(preview.getchannel("A")) if np is not None else None
-                score = float((alpha > 32).mean()) if alpha is not None else 0.0
-                cutouts.append((score, cutout, cutout_note, cached))
-            except Exception:
-                continue
-        if not cutouts:
-            raise ValueError("none of the listing gallery images could be converted")
-        _, source_image, cutout_note, selected_original = min(cutouts, key=lambda entry: abs(entry[0] - 0.35))
-        gallery = [entry[1] for entry in cutouts]
-        note = f"{note} · {len(cutouts)} listing image(s) processed · {cutout_note}"
-    except Exception as exc:
-        note = f"{note} · automatic cutout unavailable ({type(exc).__name__}); original source retained"
+    # The photo the user supplied (or the listing's main og:image) is the hero
+    # photo and is always used first. Additional gallery photos are processed
+    # so the 3D view can show the item from other real angles.
+    gallery = []
+    candidates = list(dict.fromkeys(([image_url] if image_url else []) + ([upload_contents] if upload_contents and not image_url else []) + ([source_image] if source_image else []) + listing_images))[:5]
+    for candidate in candidates:
+        try:
+            gallery.append(process_listing_photo(candidate, listing_url))
+        except Exception as exc:
+            log_pipeline({"stage": "cutout", "ok": False, "error": type(exc).__name__})
+    if not gallery:
+        return no_update, "None of the listing photos could be downloaded. Add a direct image URL or screenshot; no item was invented."
+    gallery[0]["view"] = "front"
+    hero = gallery[0]
+    note = f"{note} · {len(gallery)} listing photo(s) cached at full resolution · {hero['method']}" + ("" if hero["cutout_ok"] else " · cutout unreliable, showing the untouched photo")
     dimensions, dimension_source, dimension_confidence = infer_item_dimensions(title, description)
     agent_result = analyze_listing(title, description)
     room_prior_m = 4.0
@@ -584,7 +476,7 @@ def add_item(_, listing_url, image_url, upload_contents, library):
     agent_note = f" · agent: {agent_result.get('category', 'other')}"
     if agent_result.get("flags"):
         agent_note += " · " + "; ".join(agent_result["flags"][:2])
-    item = {"id": f"item-{uuid4().hex[:8]}", "src": source_image, "original_src": selected_original if 'selected_original' in locals() else source_image, "gallery": gallery if 'gallery' in locals() else [source_image], "title": title, "raw_description": description, "listing_url": listing_url, "source_note": note + agent_note, "dimensions": dimensions, "dimension_source": dimension_source, "dimension_confidence": dimension_confidence, "visual_scale": visual_scale, "pose": pose, "rotation": 0, "agent": agent_result}
+    item = {"id": f"item-{uuid4().hex[:8]}", "src": hero["cutout"], "original_src": hero["photo"], "display": "cutout" if hero["cutout_ok"] else "photo", "gallery": gallery, "title": title, "raw_description": description, "listing_url": listing_url, "source_note": note + agent_note, "dimensions": dimensions, "dimension_source": dimension_source, "dimension_confidence": dimension_confidence, "visual_scale": visual_scale, "pose": pose, "rotation": 0, "agent": agent_result}
     updated = [item] + (library or [])
     return updated[:12], f"Added {title}. Dimensions: {dimensions.get('width_m', 0):.2f} m W × {dimensions.get('height_m', 0):.2f} m H · {dimension_source}."
 
