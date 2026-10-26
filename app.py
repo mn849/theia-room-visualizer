@@ -486,7 +486,7 @@ app.layout = html.Div([
             html.Div([
                 html.Div([html.Div([html.P("PREVIEW", className="eyebrow"), html.H2("Your room"), dcc.RadioItems(id="view-mode", options=[{"label": "2D photo", "value": "2d"}, {"label": "3D room", "value": "3d"}], value="2d", inline=True, className="view-mode-toggle", persistence=True, persistence_type="session")], className="preview-title"), html.Div([html.Div(id="scene3d", className="scene3d"), html.Div(id="stage", children=empty_stage(), className="preview-canvas")], id="preview-wrap", className="preview-wrap"), html.Div(id="scene-notes", className="scene-notes")]),
                 html.Div(id="item-library", className="item-library"),
-                html.Div([html.P("ORIENTATION", className="eyebrow"), dcc.Dropdown(id="item-select", options=[], placeholder="Choose an item", clearable=False, className="item-select"), dcc.Dropdown(id="item-pose", options=[{"label":"Standing / upright", "value":"upright"}, {"label":"Flat on the floor", "value":"flat"}, {"label":"Facing the wall", "value":"wall"}], value="upright", clearable=False, className="item-select"), dcc.Slider(id="item-rotation", min=-180, max=180, step=1, value=0, marks={-180: "−180°", 0: "Straight", 180: "+180°"}, tooltip={"placement": "bottom", "always_visible": True}), html.Small("Choose how the object sits in the room, then rotate it (or press Q / E in the 3D view). Upright items snap flush to a wall when dragged close to it; rugs lie flat; art hangs on walls.", className="control-note")], className="orientation-controls"),
+                html.Div([html.P("ORIENTATION", className="eyebrow"), dcc.Dropdown(id="item-select", options=[], placeholder="Choose an item", clearable=False, className="item-select"), dcc.Dropdown(id="item-pose", options=[{"label":"Standing / upright", "value":"upright"}, {"label":"Flat on the floor", "value":"flat"}, {"label":"Facing the wall", "value":"wall"}], value="upright", clearable=False, className="item-select"), dcc.Slider(id="item-rotation", min=-180, max=180, step=1, value=0, marks={-180: "−180°", 0: "Straight", 180: "+180°"}, tooltip={"placement": "bottom", "always_visible": True}), html.Div([html.Span("Real height", className="size-label"), dcc.Input(id="item-height-input", type="number", min=1, step=0.5, placeholder="e.g. 66", className="text-input size-input"), dcc.Dropdown(id="item-height-unit", options=[{"label": "cm", "value": "cm"}, {"label": "inches", "value": "in"}], value="cm", clearable=False, className="measurement-unit"), html.Button("Set size", id="set-item-size", n_clicks=0, className="secondary-button small-button")], className="size-row"), html.Small(id="item-size-note", className="control-note"), html.Small("Choose how the object sits in the room, then rotate it (or press Q / E in the 3D view). Upright items snap flush to a wall when dragged close to it; rugs lie flat; art hangs on walls.", className="control-note")], className="orientation-controls"),
                 html.Div([
                     html.P("LOVE IT? MESSAGE THE SELLER", className="eyebrow"),
                     html.Div([html.Button("♡ Love it", id="heart-selected", n_clicks=0, className="heart-button"), html.Span(id="heart-status", className="control-note")], className="seller-actions"),
@@ -887,6 +887,34 @@ def item_card(item: dict):
 
 def _selected(items, selected_id):
     return next((item for item in items or [] if item.get("id") == selected_id), None)
+
+
+@app.callback(Output("item-size-note", "children"), Input("item-select", "value"), Input("item-library-data", "data"))
+def show_item_size(selected_id, items):
+    item = _selected(items, selected_id)
+    if not item:
+        return ""
+    d = item.get("dimensions") or {}
+    return f"Theia is using {d.get('width_m', 0) * 100:.0f} cm W × {d.get('height_m', 0) * 100:.0f} cm H ({item.get('dimension_source', 'estimate')}). If you know the real height, enter it to correct the size."
+
+
+@app.callback(Output("item-library-data", "data", allow_duplicate=True), Output("item-height-input", "value"), Input("set-item-size", "n_clicks"), State("item-height-input", "value"), State("item-height-unit", "value"), State("item-select", "value"), State("item-library-data", "data"), prevent_initial_call=True)
+def set_item_size(n_clicks, value, unit, selected_id, items):
+    """Let the user correct an item's size: keep its proportions, set its height."""
+    item = _selected(items, selected_id)
+    if not n_clicks or not item or not value or value <= 0:
+        return no_update, no_update
+    new_h = float(value) * (0.01 if unit == "cm" else 0.0254)
+    d = dict(item.get("dimensions") or {})
+    old_h = float(d.get("height_m") or new_h)
+    factor = new_h / old_h if old_h else 1.0
+    for key in ("width_m", "height_m", "depth_m"):
+        if d.get(key):
+            d[key] = float(d[key]) * factor
+    d["height_m"] = new_h
+    updated = {**item, "dimensions": d, "dimension_source": "height entered by you, proportions from the photo"}
+    log_pipeline({"stage": "user_size", "factor": round(factor, 3)})
+    return [updated if it.get("id") == selected_id else it for it in items], None
 
 
 # The heart + message panel uses fixed component ids (one panel for the
