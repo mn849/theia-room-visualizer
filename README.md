@@ -51,7 +51,7 @@ The repository includes `render.yaml` and `Procfile`. Create a new Render Web Se
 ## Project map
 
 - `app.py` — Dash application, public metadata reader, room calibration, and placement workflow
-- `listing_agent.py` — GPT-6-Sol classifier, schema validation, safety fallback, and token log writer
+- `listing_agent.py` — gpt-6-luna classifier, schema validation, safety fallback, and token log writer
 - `assets/style.css` — visual system and responsive layout
 - `assets/placement.js` — 2D fallback drag behaviour (used only if the 3D viewer cannot load)
 - `assets/scene3d.js` — three.js 3D room viewer (photo view, orbit, item dragging, wall snapping)
