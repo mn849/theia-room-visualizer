@@ -33,6 +33,22 @@ app = Dash(__name__, title="Theia | Visualize a listing")
 app.config.suppress_callback_exceptions = True
 server = app.server
 media_store.register(server)
+
+
+@server.route("/client-log", methods=["POST"])
+def client_log():  # pragma: no cover - exercised from the browser
+    """Append browser diagnostics (errors + image-free layout snapshot)."""
+    from flask import request
+    raw = request.get_data(cache=False, as_text=True)[:20000]
+    try:
+        entry = json.loads(raw)
+    except ValueError:
+        return ("", 400)
+    path = Path(__file__).resolve().parent / "logs" / "client_diagnostics.jsonl"
+    path.parent.mkdir(exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"timestamp": datetime.now(timezone.utc).isoformat(), **entry})[:20000] + "\n")
+    return ("", 204)
 app.index_string = """<!DOCTYPE html>
 <html>
     <head>
