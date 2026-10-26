@@ -4,6 +4,41 @@
     if (!image) return;
     const reset = document.getElementById('reset-floor');
     const pointLabels = ['Near left', 'Near right', 'Far right', 'Far left'];
+    // Draw the floor outline through the placed points so users can see the
+    // shape they are defining, not just four isolated markers.
+    function drawOutline() {
+      const layer = document.getElementById('floor-markers');
+      if (!layer) return;
+      let svg = layer.querySelector('svg.floor-outline');
+      if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'floor-outline');
+        svg.setAttribute('viewBox', '0 0 100 100');
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'polygon'));
+        layer.prepend(svg);
+      }
+      const pts = Array.from(layer.querySelectorAll('.floor-marker'))
+        .sort(function (a, b) { return a.dataset.index - b.dataset.index; })
+        .map(function (m) { return parseFloat(m.style.left) + ',' + parseFloat(m.style.top); });
+      const poly = svg.querySelector('polygon');
+      poly.setAttribute('points', pts.join(' '));
+      poly.setAttribute('class', pts.length === 4 ? 'closed' : 'open');
+    }
+    function makeMarker(index, x, y) {
+      const marker = document.createElement('span');
+      marker.className = 'floor-marker';
+      marker.dataset.index = String(index);
+      marker.title = pointLabels[index - 1] + ' floor corner (drag to adjust)';
+      marker.style.left = x + '%'; marker.style.top = y + '%';
+      const tag = document.createElement('span');
+      tag.className = 'floor-marker-tag';
+      tag.textContent = index + ' · ' + pointLabels[index - 1];
+      if (y < 12) tag.classList.add('below');
+      if (x > 78) tag.classList.add('left');
+      marker.appendChild(tag);
+      return marker;
+    }
     const apply = document.getElementById('apply-floor');
     if (apply && apply.dataset.wired !== 'true') {
       apply.dataset.wired = 'true';
@@ -44,6 +79,9 @@
         event.preventDefault(); event.stopPropagation();
         const point = pointFromEvent(event);
         marker.style.left = point.x + '%'; marker.style.top = point.y + '%';
+        const tag = marker.querySelector('.floor-marker-tag');
+        if (tag) { tag.classList.toggle('below', point.y < 12); tag.classList.toggle('left', point.x > 78); }
+        drawOutline();
         setInputValue(document.getElementById('corner-' + index + '-x'), point.x.toFixed(1));
         setInputValue(document.getElementById('corner-' + index + '-y'), point.y.toFixed(1));
       });
@@ -96,11 +134,9 @@
             const input = pair[0];
             setInputValue(input, pair[1].toFixed(1));
           });
-          const marker = document.createElement('span');
-          marker.className = 'floor-marker'; marker.textContent = pointLabels[i - 1];
-          marker.style.left = x + '%'; marker.style.top = y + '%';
+          const marker = makeMarker(i, x, y);
           const markers = document.getElementById('floor-markers');
-          if (markers) { markers.appendChild(marker); wireMarker(marker, i); }
+          if (markers) { markers.appendChild(marker); wireMarker(marker, i); drawOutline(); }
           updateStatus();
           break;
         }
