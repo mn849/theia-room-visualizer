@@ -1060,6 +1060,20 @@ def render_preview(room, items, calibration, selected, positions):
             item = {**item, "dimensions": dims, "dimension_source": source, "dimension_confidence": confidence}
         migrated_items.append(item)
     items = migrated_items
+    # Re-read sizes for items saved before the parsing fixes (e.g. a table
+    # stored as 1 inch wide from "Listed 1w ago"), unless the user set the size.
+    refreshed = []
+    for item in items:
+        if item.get("raw_description") is not None and not str(item.get("dimension_source", "")).startswith("height entered by you"):
+            aspect = None
+            gallery = item.get("gallery") or []
+            if gallery and isinstance(gallery[0], dict):
+                aspect = gallery[0].get("aspect")
+            dims, source, confidence = measurements.infer_dimensions(item.get("title", ""), item.get("raw_description", ""), aspect, (item.get("agent") or {}).get("category"))
+            if abs(dims.get("width_m", 0) - (item.get("dimensions") or {}).get("width_m", 0)) > 0.01:
+                item = {**item, "dimensions": dims, "dimension_source": source, "dimension_confidence": confidence}
+        refreshed.append(item)
+    items = refreshed
     room_dimensions = {"width_m": 4.0, "length_m": 4.0, "height_m": 2.5, **(calibration or {}).get("dimensions_m", {})}
     room_width_m = float(room_dimensions["width_m"])
     items = [{**item, "visual_scale": max(0.08, min(0.72, (item.get("dimensions", {}).get("height_m", 1.0) / room_dimensions["height_m"]) if (calibration or {}).get("source", "").endswith("height") else item.get("dimensions", {}).get("width_m", 1.0) / room_width_m))} for item in items]
