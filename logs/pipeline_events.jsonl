@@ -53,3 +53,32 @@
 {"timestamp": "2026-10-26T20:46:57.536663+00:00", "stage": "cutout", "ok": false, "error": "ValueError"}
 {"timestamp": "2026-10-26T20:47:00.938465+00:00", "stage": "scene_items", "library": 1, "in_scene": 1}
 {"timestamp": "2026-10-26T20:47:00.981681+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:50:25.418046+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -4.41, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:50:25.418605+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:50:25.445513+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
+{"timestamp": "2026-10-26T20:50:25.446062+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:50:25.462819+00:00", "stage": "room_scene", "layout_source": "vertical edges in the photo (9 lines)", "focal_source": "typical 26 mm phone lens (assumed)", "camera_height_m": 1.45, "pitch_deg": 0.25, "roll_deg": 0.01, "confidence": "rough", "depth": false}
+{"timestamp": "2026-10-26T20:50:25.463272+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:50:36.777099+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:50:36.815583+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:51:11.366989+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -3.85, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:51:11.367462+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:51:11.389620+00:00", "stage": "room_scene", "layout_source": "clicked floor corners + roll from 9 vertical edges", "focal_source": "floor-corner vanishing points", "camera_height_m": 1.45, "pitch_deg": -3.85, "roll_deg": 0.01, "confidence": "good", "depth": false}
+{"timestamp": "2026-10-26T20:51:11.389871+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:51:19.445632+00:00", "stage": "scene_items", "library": 0, "in_scene": 0}
+{"timestamp": "2026-10-26T20:51:29.351221+00:00", "stage": "cutout", "width": 600, "height": 904, "method": "u2net segmentation + colour-guided repair", "background_pockets_cleared_px": 0, "pattern_holes_filled": 0, "recovered_px": 314, "removed_px": 2028, "holes_restored": 0, "holes_cleared": 0, "specks_removed": 0, "coverage": 0.144, "edge_contact": 0.0, "ok": true, "aspect": 1.2571}
+{"timestamp": "2026-10-26T20:51:29.747996+00:00", "stage": "cutout", "ok": false, "error": "ValueError"}
+{"timestamp": "2026-10-26T20:51:31.124011+00:00", "stage": "split_listing", "pieces": 2, "seller_quantity": 2}
+{"timestamp": "2026-10-26T20:51:31.154917+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.218997+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.286666+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.297554+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.298745+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.306858+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.308011+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.308031+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.315016+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:31.324397+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:46.011908+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:46.016803+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}
+{"timestamp": "2026-10-26T20:51:46.023764+00:00", "stage": "scene_items", "library": 2, "in_scene": 2}

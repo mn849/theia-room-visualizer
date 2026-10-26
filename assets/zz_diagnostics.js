@@ -22,7 +22,7 @@
   });
   const origError = console.error;
   console.error = function () {
-    try { send('console', { message: Array.prototype.map.call(arguments, function (a) { return String(a && a.stack || a); }).join(' ').slice(0, 1500) }); } catch (e) { /* ignore */ }
+    try { send('console', { message: Array.prototype.map.call(arguments, function (a) { if (a && a.stack) return String(a.stack); if (a && typeof a === 'object') { try { return JSON.stringify(a).slice(0, 800); } catch (e) { return String(a); } } return String(a); }).join(' ').slice(0, 1500) }); } catch (e) { /* ignore */ }
     return origError.apply(console, arguments);
   };
 

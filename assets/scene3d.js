@@ -709,7 +709,25 @@
     if (roomChanged) goPhotoView(false);
   }
 
+  // Browser-side twin of app.item_for_scene: turn a saved item into what the
+  // viewer needs (photos per viewing angle + seller/estimated dimensions).
+  const ANGLES = { front: 0, 'front-right': 45, right: 90, back: 180, left: -90, 'front-left': -45 };
+  function itemForScene(item) {
+    let gallery = Array.isArray(item.gallery) ? item.gallery.filter(function (g) { return g && typeof g === 'object'; }) : [];
+    if (!gallery.length) gallery = [{ photo: item.original_src || item.src, cutout: item.src, cutout_ok: true, view: 'front' }];
+    const views = [];
+    gallery.forEach(function (entry) {
+      if (!(entry.view in ANGLES)) return;
+      const usePhoto = item.display === 'photo' || entry.cutout_ok === false;
+      views.push({ src: usePhoto ? entry.photo : entry.cutout, aspect: (usePhoto ? entry.photo_aspect : entry.aspect) || entry.aspect || 1, angle: ANGLES[entry.view] });
+    });
+    if (!views.length) views.push({ src: item.src, aspect: (gallery[0] && gallery[0].aspect) || 1, angle: 0 });
+    const d = item.dimensions || {};
+    return { id: item.id, title: item.title || 'Item', pose: item.pose || 'upright', views: views, dims: { w: d.width_m, h: d.height_m, d: d.depth_m } };
+  }
+
   window.TheiaScene = {
+    itemForScene: itemForScene,
     update: function (scene, placements, selected, mode) {
       pending = { scene: scene, placements: placements, selected: selected, mode: mode || '2d' };
       window.__theiaSceneItems = scene && scene.items ? scene.items.length : null;

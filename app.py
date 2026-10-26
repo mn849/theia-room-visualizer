@@ -756,8 +756,12 @@ def set_view_angle(values, items):
     return updated if changed else no_update
 
 
-@app.callback(Output("scene-data", "data"), Output("scene-notes", "children"), Input("room-state", "data"), Input("room-calibration", "data"), Input("item-library-data", "data"))
-def update_scene(room, calibration, items):
+# Only the room goes through the server. Items are passed to the 3D viewer
+# straight from the browser's item store (see the clientside callback below):
+# a slow server round-trip used to arrive after a newer one and overwrite the
+# scene with zero items, which is why items vanished from the 3D view.
+@app.callback(Output("scene-data", "data"), Output("scene-notes", "children"), Input("room-state", "data"), Input("room-calibration", "data"))
+def update_scene(room, calibration, items=None):
     if not (room or {}).get("src"):
         return None, ""
     try:
@@ -771,14 +775,7 @@ def update_scene(room, calibration, items):
         f"camera {scene['camera_height_m']:.2f} m above the floor, tilted {scene['camera']['pitch_deg']:.1f}°, roll {scene['camera']['roll_deg']:.1f}° · lens from {scene['focal_source']} · floor from {scene['layout_source']} · room ≈ {scene['room_width_m']:.2f} m wide. ",
         *[html.Span(note + " ") for note in scene["notes"]],
     ]
-    scene_items = []
-    for item in items or []:
-        try:
-            scene_items.append(item_for_scene(item))
-        except Exception as exc:  # one bad item must not hide the others
-            log_pipeline({"stage": "scene_item", "error": type(exc).__name__, "detail": str(exc)[:200]})
-    log_pipeline({"stage": "scene_items", "library": len(items or []), "in_scene": len(scene_items)})
-    return {"room": room_payload, "items": scene_items}, notes
+    return {"room": room_payload, "items": []}, notes
 
 
 app.clientside_callback(
@@ -787,11 +784,14 @@ app.clientside_callback(
 )
 
 app.clientside_callback(
-    """function(scene, placements, selected, mode) {
-        if (window.TheiaScene) { window.TheiaScene.update(scene, placements || {}, selected || null, mode || '2d'); }
+    """function(scene, items, placements, selected, mode) {
+        if (window.TheiaScene) {
+            const full = scene ? Object.assign({}, scene, {items: (items || []).map(window.TheiaScene.itemForScene)}) : null;
+            window.TheiaScene.update(full, placements || {}, selected || null, mode || '2d');
+        }
         return window.dash_clientside.no_update;
     }""",
-    Output("scene-sink", "data"), Input("scene-data", "data"), Input("item-placements", "data"), Input("item-select", "value"), Input("view-mode", "value"),
+    Output("scene-sink", "data"), Input("scene-data", "data"), Input("item-library-data", "data"), Input("item-placements", "data"), Input("item-select", "value"), Input("view-mode", "value"),
 )
 
 app.clientside_callback(
