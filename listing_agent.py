@@ -28,9 +28,9 @@ LOG_PATH = PROJECT_DIR / "logs" / "agent_calls.jsonl"
 for candidate in (PROJECT_DIR / ".env", PROJECT_DIR.parent / ".env"):
     if candidate.exists():
         load_dotenv(candidate, override=False)
-# The course Portkey key is only licensed for gpt-6-luna. Override with
-# THEIA_MODEL only when using your own key.
-MODEL = os.getenv("THEIA_MODEL", "gpt-6-luna")
+# Every agent call uses gpt-6-luna, the only model allowed on the course
+# Portkey key (both the listing agent and the seller-message agent import this).
+MODEL = "gpt-6-luna"
 
 
 def _log(event: dict[str, Any]) -> None:

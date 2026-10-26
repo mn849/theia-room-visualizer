@@ -1,6 +1,6 @@
 # Theia project handoff
 
-Theia is a Facebook Marketplace focused room-visualization Dash app. It supports room uploads, session room/item libraries, listing metadata and dimensions, multiple listing images, furniture cutouts, unit conversion, click-and-drag floor point calibration, perspective-aware item scaling, and a GPT-6-Sol advisory listing agent through Portkey.
+Theia is a Facebook Marketplace focused room-visualization Dash app. It supports room uploads, session room/item libraries, listing metadata and dimensions, multiple listing images, furniture cutouts, unit conversion, click-and-drag floor point calibration, perspective-aware item scaling, and a gpt-6-luna advisory listing agent and seller-message agent through Portkey.
 
 ## Run
 
@@ -17,7 +17,7 @@ The production command is in `Procfile`; Render configuration is in `render.yaml
 ## Important files
 
 - `app.py`: Dash application, Marketplace metadata parsing, dimensions, cutouts, room calibration, preview.
-- `listing_agent.py`: GPT-6-Sol Responses API agent, safety validation, fallback, and logs.
+- `listing_agent.py`: gpt-6-luna Responses API agent, safety validation, fallback, and logs.
 - `assets/calibration.js`: labelled draggable floor points.
 - `assets/placement.js`: item drag and depth scaling.
 - `assets/style.css`: Theia visual system.
